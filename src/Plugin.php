@@ -11,6 +11,7 @@ use Axs4allAi\Admin\QueuePage;
 use Axs4allAi\Admin\SettingsPage;
 use Axs4allAi\Ai\OpenAiClient;
 use Axs4allAi\Classification\ClassificationCommand;
+use Axs4allAi\Classification\ClassificationQueueRepository;
 use Axs4allAi\Classification\PromptRepository;
 use Axs4allAi\Category\CategoryRegistrar;
 use Axs4allAi\Category\CategoryRepository;
@@ -25,6 +26,7 @@ final class Plugin
     private PromptRepository $promptRepository;
     private CategoryRegistrar $categoryRegistrar;
     private CategoryRepository $categoryRepository;
+    private ClassificationQueueRepository $classificationQueueRepository;
     public function __construct()
     {
         global $wpdb;
@@ -34,6 +36,7 @@ final class Plugin
         $this->promptRepository = new PromptRepository($wpdb);
         $this->categoryRegistrar = new CategoryRegistrar();
         $this->categoryRepository = new CategoryRepository();
+        $this->classificationQueueRepository = new ClassificationQueueRepository($wpdb);
     }
 
     public function boot(): void
@@ -77,7 +80,12 @@ final class Plugin
     {
         $apiKey = $this->resolveApiKey();
         $client = new OpenAiClient($apiKey);
-        $command = new ClassificationCommand($this->promptRepository, $client, $this->categoryRepository);
+        $command = new ClassificationCommand(
+            $this->promptRepository,
+            $client,
+            $this->categoryRepository,
+            $this->classificationQueueRepository
+        );
         $command->register();
     }
 

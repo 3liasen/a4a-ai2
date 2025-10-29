@@ -10,10 +10,17 @@ use Axs4allAi\Category\CategoryRepository;
 final class ClassificationCommand
 {
     private ClassificationRunner $runner;
+    private ?ClassificationQueueRepository $queueRepository;
 
-    public function __construct(PromptRepository $prompts, AiClientInterface $client, ?CategoryRepository $categories = null)
+    public function __construct(
+        PromptRepository $prompts,
+        AiClientInterface $client,
+        ?CategoryRepository $categories = null,
+        ?ClassificationQueueRepository $queueRepository = null
+    )
     {
-        $this->runner = new ClassificationRunner($prompts, $client, $categories);
+        $this->queueRepository = $queueRepository;
+        $this->runner = new ClassificationRunner($prompts, $client, $categories, $queueRepository);
     }
 
     public function register(): void
@@ -31,20 +38,37 @@ final class ClassificationCommand
      */
     public function handle(array $args, array $assocArgs): void
     {
-        $jobs = [
-            [
+        $limit = isset($assocArgs['limit']) ? max(1, (int) $assocArgs['limit']) : 5;
+        $jobs = [];
+
+        if (! empty($assocArgs['content'])) {
+            $jobs[] = [
                 'id' => 0,
                 'category' => $assocArgs['category'] ?? 'default',
-                'content' => $assocArgs['content'] ?? 'This venue offers step-free access and wide doorways.',
+                'content' => (string) $assocArgs['content'],
                 'url' => $assocArgs['url'] ?? '',
-                'previous_decision' => '',
-            ],
-        ];
+                'previous_decision' => $assocArgs['previous_decision'] ?? '',
+                'prompt_version' => $assocArgs['prompt_version'] ?? 'v1',
+            ];
+        } elseif ($this->queueRepository instanceof ClassificationQueueRepository) {
+            $jobs = $this->queueRepository->claimBatch($limit);
+            if (empty($jobs)) {
+                if (defined('WP_CLI') && \WP_CLI) {
+                    \WP_CLI::log('No pending classification jobs.');
+                }
+                return;
+            }
+        } else {
+            if (defined('WP_CLI') && \WP_CLI) {
+                \WP_CLI::error('No jobs to process. Provide --content or ensure the classification queue is configured.');
+            }
+            return;
+        }
 
         $this->runner->process($jobs);
 
         if (defined('WP_CLI') && \WP_CLI) {
-            \WP_CLI::success('Classification stub executed. Check debug.log for details.');
+            \WP_CLI::success('Classification run completed. Check debug.log for details.');
         }
     }
 }
