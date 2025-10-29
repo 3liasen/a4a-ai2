@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Axs4allAi;
 
+use Axs4allAi\Admin\DebugPage;
 use Axs4allAi\Admin\QueuePage;
 use Axs4allAi\Admin\SettingsPage;
 use Axs4allAi\Crawl\CrawlScheduler;
@@ -42,10 +43,13 @@ final class Plugin
     {
         $settings = new SettingsPage();
         $queuePage = new QueuePage($this->queueRepository);
+        $debugPage = new DebugPage();
 
         add_action('admin_menu', [$settings, 'registerMenu']);
         add_action('admin_menu', [$queuePage, 'registerMenu']);
+        add_action('admin_menu', [$debugPage, 'registerMenu']);
         add_action('admin_init', [$settings, 'registerSettings']);
         add_action('admin_init', [$queuePage, 'registerActions']);
+        add_action('admin_init', [$debugPage, 'registerActions']);
     }
 }
