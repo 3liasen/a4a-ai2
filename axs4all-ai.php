@@ -11,6 +11,9 @@
 
 declare(strict_types=1);
 
+use Axs4allAi\Crawl\CrawlScheduler;
+use Axs4allAi\Infrastructure\Installer;
+
 if (! defined('ABSPATH')) {
     exit;
 }
@@ -31,6 +34,9 @@ if (file_exists($env) && class_exists(\Dotenv\Dotenv::class)) {
     $dotenv = \Dotenv\Dotenv::createImmutable(__DIR__);
     $dotenv->safeLoad();
 }
+
+register_activation_hook(AXS4ALL_AI_PLUGIN_FILE, [Installer::class, 'activate']);
+register_deactivation_hook(AXS4ALL_AI_PLUGIN_FILE, [CrawlScheduler::class, 'deactivate']);
 
 if (! class_exists(\Axs4allAi\Plugin::class)) {
     return;
