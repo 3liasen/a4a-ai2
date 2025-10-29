@@ -37,11 +37,21 @@ if (! class_exists(\Axs4allAi\Plugin::class)) {
             }
 
             $relative = str_replace('Axs4allAi\\', '', $class);
-            $relative = str_replace('\\', DIRECTORY_SEPARATOR, $relative);
-            $path = __DIR__ . '/src/' . $relative . '.php';
+            $relative = str_replace('\\', DIRECTORY_SEPARATOR, $relative) . '.php';
 
-            if (file_exists($path)) {
-                require_once $path;
+            $bases = [
+                __DIR__ . '/src/',
+                __DIR__ . '/admin/',
+                __DIR__ . '/includes/',
+                __DIR__ . '/templates/',
+            ];
+
+            foreach ($bases as $base) {
+                $path = $base . $relative;
+                if (file_exists($path)) {
+                    require_once $path;
+                    return;
+                }
             }
         }
     );
