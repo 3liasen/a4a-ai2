@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace Axs4allAi\Classification;
 
 use Axs4allAi\Ai\AiClientInterface;
+use Axs4allAi\Category\CategoryRepository;
 
 final class ClassificationCommand
 {
     private ClassificationRunner $runner;
 
-    public function __construct(PromptRepository $prompts, AiClientInterface $client)
+    public function __construct(PromptRepository $prompts, AiClientInterface $client, ?CategoryRepository $categories = null)
     {
-        $this->runner = new ClassificationRunner($prompts, $client);
+        $this->runner = new ClassificationRunner($prompts, $client, $categories);
     }
 
     public function register(): void

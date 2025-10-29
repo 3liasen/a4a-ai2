@@ -1,4 +1,4 @@
-# Phase 2 — AI Classification Engine Design
+# Phase 2 – AI Classification Engine Design
 
 ## Objectives
 - Transform extracted snippets into deterministic yes/no accessibility classifications.
@@ -58,3 +58,8 @@
 5. Add admin list table shell for monitoring jobs/results.
 
 > ✅ Database migrations and prompt management UI/repository scaffolding are now in place.
+
+### Category Options Bridge
+- Categories persist as custom post types (`axs4all_ai_category`) with option lists stored in post meta, mirroring the legacy structure.
+- Admin panel offers CRUD for categories plus per-line option editing.
+- Classification runner now injects category option metadata into prompt contexts for downstream usage.

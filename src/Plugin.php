@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Axs4allAi;
 
+use Axs4allAi\Admin\CategoryPage;
 use Axs4allAi\Admin\DebugPage;
 use Axs4allAi\Admin\PromptPage;
 use Axs4allAi\Admin\QueuePage;
@@ -11,6 +12,8 @@ use Axs4allAi\Admin\SettingsPage;
 use Axs4allAi\Ai\OpenAiClient;
 use Axs4allAi\Classification\ClassificationCommand;
 use Axs4allAi\Classification\PromptRepository;
+use Axs4allAi\Category\CategoryRegistrar;
+use Axs4allAi\Category\CategoryRepository;
 use Axs4allAi\Crawl\CrawlScheduler;
 use Axs4allAi\Data\QueueRepository;
 use Axs4allAi\Infrastructure\Installer;
@@ -20,6 +23,8 @@ final class Plugin
     private QueueRepository $queueRepository;
     private CrawlScheduler $crawlScheduler;
     private PromptRepository $promptRepository;
+    private CategoryRegistrar $categoryRegistrar;
+    private CategoryRepository $categoryRepository;
     public function __construct()
     {
         global $wpdb;
@@ -27,6 +32,8 @@ final class Plugin
         $this->queueRepository = new QueueRepository($wpdb);
         $this->crawlScheduler = new CrawlScheduler($this->queueRepository);
         $this->promptRepository = new PromptRepository($wpdb);
+        $this->categoryRegistrar = new CategoryRegistrar();
+        $this->categoryRepository = new CategoryRepository();
     }
 
     public function boot(): void
@@ -40,6 +47,7 @@ final class Plugin
 
         load_plugin_textdomain('axs4all-ai', false, dirname(plugin_basename(AXS4ALL_AI_PLUGIN_FILE)) . '/languages');
 
+        $this->categoryRegistrar->register();
         $this->registerAdminHooks();
         $this->crawlScheduler->register();
         $this->registerCliCommands();
@@ -51,22 +59,25 @@ final class Plugin
         $queuePage = new QueuePage($this->queueRepository);
         $debugPage = new DebugPage();
         $promptPage = new PromptPage($this->promptRepository);
+        $categoryPage = new CategoryPage($this->categoryRepository);
 
         add_action('admin_menu', [$settings, 'registerMenu']);
         add_action('admin_menu', [$queuePage, 'registerMenu']);
         add_action('admin_menu', [$debugPage, 'registerMenu']);
         add_action('admin_menu', [$promptPage, 'registerMenu']);
+        add_action('admin_menu', [$categoryPage, 'registerMenu']);
         add_action('admin_init', [$settings, 'registerSettings']);
         add_action('admin_init', [$queuePage, 'registerActions']);
         add_action('admin_init', [$debugPage, 'registerActions']);
         add_action('admin_init', [$promptPage, 'registerActions']);
+        add_action('admin_init', [$categoryPage, 'registerActions']);
     }
 
     private function registerCliCommands(): void
     {
         $apiKey = $this->resolveApiKey();
         $client = new OpenAiClient($apiKey);
-        $command = new ClassificationCommand($this->promptRepository, $client);
+        $command = new ClassificationCommand($this->promptRepository, $client, $this->categoryRepository);
         $command->register();
     }
 
