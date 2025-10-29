@@ -68,3 +68,8 @@
 - Queue repository handles enqueueing, claiming, and completion/failure of classification jobs.
 - CLI command processes real queue items or ad-hoc content and records results.
 - Results table captures model metadata, raw responses, and timing metrics for future analysis.
+
+### OpenAI Client
+- Real OpenAI chat completions integration via Guzzle with strict yes/no response validation.
+- Metrics (model, token counts, latency) are surfaced with each classification result.
+- Errors propagate back into the queue with sanitised diagnostics for retry control.

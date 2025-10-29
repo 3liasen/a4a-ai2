@@ -122,12 +122,12 @@ final class ClassificationQueueRepository
             'queue_id' => $queueId,
             'extraction_id' => ($extractionId !== null && $extractionId > 0) ? $extractionId : null,
             'decision' => $result->decision(),
-            'confidence' => $result->confidence() !== null ? (string) $result->confidence() : null,
+            'confidence' => $result->confidence(),
             'prompt_version' => $promptVersion,
             'model' => $model ?? ($metrics['model'] ?? null),
-            'tokens_prompt' => isset($metrics['tokens_prompt']) ? (string) $metrics['tokens_prompt'] : null,
-            'tokens_completion' => isset($metrics['tokens_completion']) ? (string) $metrics['tokens_completion'] : null,
-            'duration_ms' => isset($metrics['duration_ms']) ? (string) $metrics['duration_ms'] : null,
+            'tokens_prompt' => isset($metrics['tokens_prompt']) ? (int) $metrics['tokens_prompt'] : null,
+            'tokens_completion' => isset($metrics['tokens_completion']) ? (int) $metrics['tokens_completion'] : null,
+            'duration_ms' => isset($metrics['duration_ms']) ? (int) $metrics['duration_ms'] : null,
             'raw_response' => $result->rawResponse(),
             'created_at' => current_time('mysql'),
         ];
@@ -135,7 +135,7 @@ final class ClassificationQueueRepository
         $this->wpdb->insert(
             $this->resultsTable,
             $data,
-            ['%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s']
+            ['%d', '%d', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s']
         );
     }
 
