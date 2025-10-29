@@ -1,0 +1,39 @@
+<?php
+/**
+ * Plugin Name:       axs4all AI Accessibility
+ * Description:       Automates accessibility data collection and AI-driven classification for axs4all.
+ * Version:           0.0.1
+ * Author:            SevenYellowMonkeys
+ * Requires at least: 6.0
+ * Requires PHP:      8.1
+ * Text Domain:       axs4all-ai
+ */
+
+declare(strict_types=1);
+
+if (! defined('ABSPATH')) {
+    exit;
+}
+
+define('AXS4ALL_AI_VERSION_FILE', __DIR__ . '/version.php');
+define('AXS4ALL_AI_PLUGIN_FILE', __FILE__);
+define('AXS4ALL_AI_PLUGIN_PATH', __DIR__);
+define('AXS4ALL_AI_PLUGIN_URL', plugin_dir_url(__FILE__));
+
+// Load Composer autoloader if available.
+$autoload = __DIR__ . '/vendor/autoload.php';
+if (file_exists($autoload)) {
+    require_once $autoload;
+}
+
+$env = __DIR__ . '/.env';
+if (file_exists($env) && class_exists(\Dotenv\Dotenv::class)) {
+    $dotenv = \Dotenv\Dotenv::createImmutable(__DIR__);
+    $dotenv->safeLoad();
+}
+
+if (! class_exists(\Axs4allAi\Plugin::class)) {
+    return;
+}
+
+(new \Axs4allAi\Plugin())->boot();

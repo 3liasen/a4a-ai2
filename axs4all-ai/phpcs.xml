@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<ruleset name="axs4all-ai">
+    <description>WordPress coding standards baseline.</description>
+    <arg value="sp"/>
+    <arg value="n"/>
+    <file>axs4all-ai.php</file>
+    <file>src</file>
+    <file>admin</file>
+    <file>includes</file>
+    <rule ref="WordPress"/>
+</ruleset>
