@@ -8,7 +8,7 @@ use wpdb;
 
 final class Installer
 {
-    private const DB_VERSION = '1.0.0';
+    private const DB_VERSION = '1.1.0';
     private const OPTION_KEY = 'axs4all_ai_db_version';
 
     public static function activate(): void
@@ -36,6 +36,9 @@ final class Installer
         $queueTable = $wpdb->prefix . 'axs4all_ai_queue';
         $snapshotsTable = $wpdb->prefix . 'axs4all_ai_snapshots';
         $extractionsTable = $wpdb->prefix . 'axs4all_ai_extractions';
+        $promptsTable = $wpdb->prefix . 'axs4all_ai_prompts';
+        $classificationQueueTable = $wpdb->prefix . 'axs4all_ai_classifications_queue';
+        $classificationsTable = $wpdb->prefix . 'axs4all_ai_classifications';
 
         $queueSql = "CREATE TABLE {$queueTable} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -75,7 +78,58 @@ final class Installer
             KEY queue_id (queue_id)
         ) {$charsetCollate};";
 
-        dbDelta([$queueSql, $snapshotsSql, $extractionsSql]);
+        $promptsSql = "CREATE TABLE {$promptsTable} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            category VARCHAR(64) NOT NULL DEFAULT '',
+            version VARCHAR(32) NOT NULL DEFAULT 'v1',
+            template LONGTEXT NOT NULL,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            PRIMARY KEY  (id),
+            UNIQUE KEY category_version (category, version),
+            KEY active_category (is_active, category)
+        ) {$charsetCollate};";
+
+        $classificationQueueSql = "CREATE TABLE {$classificationQueueTable} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            queue_id BIGINT UNSIGNED NOT NULL,
+            extraction_id BIGINT UNSIGNED DEFAULT NULL,
+            category VARCHAR(64) NOT NULL DEFAULT '',
+            prompt_version VARCHAR(32) NOT NULL DEFAULT 'v1',
+            status VARCHAR(32) NOT NULL DEFAULT 'pending',
+            attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            content LONGTEXT NOT NULL,
+            last_error TEXT NULL,
+            locked_at DATETIME NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            PRIMARY KEY  (id),
+            KEY status (status),
+            KEY queue_id (queue_id),
+            KEY extraction_id (extraction_id)
+        ) {$charsetCollate};";
+
+        $classificationsSql = "CREATE TABLE {$classificationsTable} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            queue_id BIGINT UNSIGNED NOT NULL,
+            extraction_id BIGINT UNSIGNED DEFAULT NULL,
+            decision VARCHAR(8) NOT NULL,
+            confidence DECIMAL(5,4) DEFAULT NULL,
+            prompt_version VARCHAR(32) NOT NULL DEFAULT 'v1',
+            model VARCHAR(64) DEFAULT NULL,
+            tokens_prompt INT UNSIGNED DEFAULT NULL,
+            tokens_completion INT UNSIGNED DEFAULT NULL,
+            duration_ms INT UNSIGNED DEFAULT NULL,
+            raw_response LONGTEXT NOT NULL,
+            created_at DATETIME NOT NULL,
+            PRIMARY KEY  (id),
+            KEY queue_id (queue_id),
+            KEY extraction_id (extraction_id),
+            KEY decision (decision)
+        ) {$charsetCollate};";
+
+        dbDelta([$queueSql, $snapshotsSql, $extractionsSql, $promptsSql, $classificationQueueSql, $classificationsSql]);
 
         update_option(self::OPTION_KEY, self::DB_VERSION);
     }
