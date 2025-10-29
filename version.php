@@ -5,4 +5,4 @@
 
 declare(strict_types=1);
 
-return '0.0.5';
+return '0.0.6';

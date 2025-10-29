@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Axs4allAi;
 
 use Axs4allAi\Admin\DebugPage;
+use Axs4allAi\Admin\PromptPage;
 use Axs4allAi\Admin\QueuePage;
 use Axs4allAi\Admin\SettingsPage;
 use Axs4allAi\Ai\OpenAiClient;
@@ -19,14 +20,13 @@ final class Plugin
     private QueueRepository $queueRepository;
     private CrawlScheduler $crawlScheduler;
     private PromptRepository $promptRepository;
-
     public function __construct()
     {
         global $wpdb;
 
         $this->queueRepository = new QueueRepository($wpdb);
         $this->crawlScheduler = new CrawlScheduler($this->queueRepository);
-        $this->promptRepository = new PromptRepository();
+        $this->promptRepository = new PromptRepository($wpdb);
     }
 
     public function boot(): void
@@ -50,13 +50,16 @@ final class Plugin
         $settings = new SettingsPage();
         $queuePage = new QueuePage($this->queueRepository);
         $debugPage = new DebugPage();
+        $promptPage = new PromptPage($this->promptRepository);
 
         add_action('admin_menu', [$settings, 'registerMenu']);
         add_action('admin_menu', [$queuePage, 'registerMenu']);
         add_action('admin_menu', [$debugPage, 'registerMenu']);
+        add_action('admin_menu', [$promptPage, 'registerMenu']);
         add_action('admin_init', [$settings, 'registerSettings']);
         add_action('admin_init', [$queuePage, 'registerActions']);
         add_action('admin_init', [$debugPage, 'registerActions']);
+        add_action('admin_init', [$promptPage, 'registerActions']);
     }
 
     private function registerCliCommands(): void

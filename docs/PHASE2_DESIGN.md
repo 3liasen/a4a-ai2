@@ -57,3 +57,4 @@
 4. Scaffold classification queue repository + runner (stub responses for now).
 5. Add admin list table shell for monitoring jobs/results.
 
+> ✅ Database migrations and prompt management UI/repository scaffolding are now in place.
