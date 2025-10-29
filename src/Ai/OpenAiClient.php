@@ -6,18 +6,14 @@ namespace Axs4allAi\Ai;
 
 use Axs4allAi\Ai\Dto\ClassificationResult;
 use Axs4allAi\Ai\Dto\PromptContext;
-use GuzzleHttp\ClientInterface;
-use GuzzleHttp\Exception\GuzzleException;
-use GuzzleHttp\Psr7\Request;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
 use RuntimeException;
 
 final class OpenAiClient implements AiClientInterface
 {
     private const DEFAULT_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 
-    private ClientInterface $httpClient;
+    /** @var object|null */
+    private $httpClient;
     private string $apiKey;
     private string $model;
     private float $temperature;
@@ -28,14 +24,20 @@ final class OpenAiClient implements AiClientInterface
         string $apiKey,
         string $model = 'gpt-4o-mini',
         float $temperature = 0.0,
-        ?ClientInterface $httpClient = null,
+        $httpClient = null,
         ?string $endpoint = null,
         float $timeout = 30.0
     ) {
         $this->apiKey = trim($apiKey);
         $this->model = $model;
         $this->temperature = $temperature;
-        $this->httpClient = $httpClient ?? new \GuzzleHttp\Client();
+        if ($httpClient !== null) {
+            $this->httpClient = $httpClient;
+        } elseif (class_exists('\GuzzleHttp\Client')) {
+            $this->httpClient = new \GuzzleHttp\Client();
+        } else {
+            $this->httpClient = null;
+        }
         $this->endpoint = $endpoint !== null ? rtrim($endpoint, '/') : self::DEFAULT_ENDPOINT;
         $this->timeout = max(1.0, $timeout);
     }
@@ -47,19 +49,15 @@ final class OpenAiClient implements AiClientInterface
         }
 
         $prompt = $this->buildPrompt($context);
-        $request = $this->createRequest($prompt);
-
         $startedAt = microtime(true);
 
-        try {
-            $response = $this->httpClient->send($request, ['timeout' => $this->timeout]);
-        } catch (GuzzleException $exception) {
-            throw new RuntimeException('OpenAI request failed: ' . $exception->getMessage(), 0, $exception);
+        if ($this->httpClient !== null) {
+            $rawBody = $this->sendWithHttpClient($prompt);
+        } else {
+            $rawBody = $this->sendWithWpHttp($prompt);
         }
 
         $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
-        $rawBody = (string) $response->getBody();
-
         $data = json_decode($rawBody, true);
         if (! is_array($data)) {
             throw new RuntimeException('OpenAI response could not be decoded.');
@@ -94,11 +92,66 @@ final class OpenAiClient implements AiClientInterface
         return strtr($template, $replacements);
     }
 
-    private function createRequest(string $prompt): RequestInterface
+    private function sendWithHttpClient(string $prompt): string
     {
-        $systemPrompt = 'You are an accessibility compliance assistant. '
-            . 'Answer strictly with the single word "yes" or "no" in lowercase.';
+        if (! method_exists($this->httpClient, 'send')) {
+            throw new RuntimeException('Configured HTTP client does not support send().');
+        }
 
+        if (! class_exists('\GuzzleHttp\Psr7\Request')) {
+            throw new RuntimeException('Guzzle PSR-7 classes are not available.');
+        }
+
+        $request = new \GuzzleHttp\Psr7\Request(
+            'POST',
+            $this->endpoint,
+            [
+                'Authorization' => 'Bearer ' . $this->apiKey,
+                'Content-Type' => 'application/json',
+            ],
+            $this->buildJsonPayload($prompt)
+        );
+
+        try {
+            $response = $this->httpClient->send($request, ['timeout' => $this->timeout]);
+        } catch (\Throwable $exception) {
+            throw new RuntimeException('OpenAI request failed: ' . $exception->getMessage(), 0, $exception);
+        }
+
+        return (string) $response->getBody();
+    }
+
+    private function sendWithWpHttp(string $prompt): string
+    {
+        if (! function_exists('wp_remote_post')) {
+            throw new RuntimeException('HTTP client not available and wp_remote_post is undefined.');
+        }
+
+        $json = $this->buildJsonPayload($prompt);
+        $args = [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $this->apiKey,
+                'Content-Type' => 'application/json',
+            ],
+            'timeout' => $this->timeout,
+            'body' => $json,
+        ];
+
+        $response = wp_remote_post($this->endpoint, $args);
+        if (is_wp_error($response)) {
+            throw new RuntimeException('OpenAI request failed: ' . $response->get_error_message());
+        }
+
+        $body = wp_remote_retrieve_body($response);
+        if (! is_string($body) || $body === '') {
+            throw new RuntimeException('OpenAI response body empty.');
+        }
+
+        return $body;
+    }
+
+    private function buildJsonPayload(string $prompt): string
+    {
         $payload = [
             'model' => $this->model,
             'temperature' => $this->temperature,
@@ -106,7 +159,7 @@ final class OpenAiClient implements AiClientInterface
             'messages' => [
                 [
                     'role' => 'system',
-                    'content' => $systemPrompt,
+                    'content' => 'You are an accessibility compliance assistant. Answer strictly with the single word "yes" or "no" in lowercase.',
                 ],
                 [
                     'role' => 'user',
@@ -115,14 +168,7 @@ final class OpenAiClient implements AiClientInterface
             ],
         ];
 
-        $json = json_encode($payload, JSON_THROW_ON_ERROR);
-
-        $headers = [
-            'Authorization' => 'Bearer ' . $this->apiKey,
-            'Content-Type' => 'application/json',
-        ];
-
-        return new Request('POST', $this->endpoint, $headers, $json);
+        return json_encode($payload, JSON_THROW_ON_ERROR);
     }
 
     /**
