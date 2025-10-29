@@ -29,6 +29,24 @@ if (file_exists($autoload)) {
     require_once $autoload;
 }
 
+if (! class_exists(\Axs4allAi\Plugin::class)) {
+    spl_autoload_register(
+        static function (string $class): void {
+            if (strpos($class, 'Axs4allAi\\') !== 0) {
+                return;
+            }
+
+            $relative = str_replace('Axs4allAi\\', '', $class);
+            $relative = str_replace('\\', DIRECTORY_SEPARATOR, $relative);
+            $path = __DIR__ . '/src/' . $relative . '.php';
+
+            if (file_exists($path)) {
+                require_once $path;
+            }
+        }
+    );
+}
+
 $env = __DIR__ . '/.env';
 if (file_exists($env) && class_exists(\Dotenv\Dotenv::class)) {
     $dotenv = \Dotenv\Dotenv::createImmutable(__DIR__);
