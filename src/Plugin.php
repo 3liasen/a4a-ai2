@@ -35,6 +35,7 @@ final class Plugin
     private ClassificationRunner $classificationRunner;
     private ClassificationScheduler $classificationScheduler;
     private CrawlRunner $crawlRunner;
+    private array $settings;
     public function __construct()
     {
         global $wpdb;
@@ -44,16 +45,27 @@ final class Plugin
         $this->categoryRegistrar = new CategoryRegistrar();
         $this->categoryRepository = new CategoryRepository();
         $this->classificationQueueRepository = new ClassificationQueueRepository($wpdb);
-        $this->aiClient = new OpenAiClient($this->resolveApiKey());
+        $this->settings = $this->loadSettings();
+        $apiKey = $this->resolveApiKey();
+        $this->aiClient = new OpenAiClient(
+            $apiKey,
+            $this->settings['model'],
+            0.0,
+            null,
+            null,
+            (float) $this->settings['timeout']
+        );
         $this->classificationRunner = new ClassificationRunner(
             $this->promptRepository,
             $this->aiClient,
             $this->categoryRepository,
-            $this->classificationQueueRepository
+            $this->classificationQueueRepository,
+            $this->settings['max_attempts']
         );
         $this->classificationScheduler = new ClassificationScheduler(
             $this->classificationQueueRepository,
-            $this->classificationRunner
+            $this->classificationRunner,
+            $this->settings['batch_size']
         );
         $this->crawlRunner = new CrawlRunner(
             $this->queueRepository,
@@ -110,7 +122,8 @@ final class Plugin
             $this->aiClient,
             $this->categoryRepository,
             $this->classificationQueueRepository,
-            $this->classificationRunner
+            $this->classificationRunner,
+            $this->settings['batch_size']
         );
         $command->register();
     }
@@ -128,6 +141,34 @@ final class Plugin
         }
 
         return '';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function loadSettings(): array
+    {
+        $options = get_option('axs4all_ai_settings', []);
+
+        $model = isset($options['model']) && $options['model'] !== ''
+            ? sanitize_text_field((string) $options['model'])
+            : 'gpt-4o-mini';
+
+        $timeout = isset($options['timeout']) ? (int) $options['timeout'] : 30;
+        $timeout = max(5, min(300, $timeout));
+
+        $batchSize = isset($options['batch_size']) ? (int) $options['batch_size'] : 5;
+        $batchSize = max(1, min(50, $batchSize));
+
+        $maxAttempts = isset($options['max_attempts']) ? (int) $options['max_attempts'] : 3;
+        $maxAttempts = max(1, min(10, $maxAttempts));
+
+        return [
+            'model' => $model,
+            'timeout' => $timeout,
+            'batch_size' => $batchSize,
+            'max_attempts' => $maxAttempts,
+        ];
     }
 }
 

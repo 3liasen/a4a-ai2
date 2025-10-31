@@ -15,17 +15,20 @@ final class ClassificationRunner
     private AiClientInterface $client;
     private ?CategoryRepository $categories;
     private ?ClassificationQueueRepository $queueRepository;
+    private ?int $maxAttempts;
 
     public function __construct(
         PromptRepository $prompts,
         AiClientInterface $client,
         ?CategoryRepository $categories = null,
-        ?ClassificationQueueRepository $queueRepository = null
+        ?ClassificationQueueRepository $queueRepository = null,
+        ?int $maxAttempts = null
     ) {
         $this->prompts = $prompts;
         $this->client = $client;
         $this->categories = $categories;
         $this->queueRepository = $queueRepository;
+        $this->maxAttempts = ($maxAttempts !== null && $maxAttempts > 0) ? $maxAttempts : null;
     }
 
     /**
@@ -90,7 +93,8 @@ final class ClassificationRunner
                 )
             );
         } catch (\Throwable $exception) {
-            $this->failJob($job, $exception->getMessage());
+            $retry = $this->shouldRetry($job);
+            $this->failJob($job, $exception->getMessage(), $retry);
         }
     }
 
@@ -112,5 +116,23 @@ final class ClassificationRunner
                 $reason
             )
         );
+    }
+
+    /**
+     * @param array<string, mixed> $job
+     */
+    private function shouldRetry(array $job): bool
+    {
+        if ($this->maxAttempts === null) {
+            return true;
+        }
+
+        if (! isset($job['attempts'])) {
+            return true;
+        }
+
+        $attempts = (int) $job['attempts'];
+
+        return $attempts < $this->maxAttempts;
     }
 }

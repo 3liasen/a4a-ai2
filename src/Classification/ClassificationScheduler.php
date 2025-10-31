@@ -8,13 +8,16 @@ final class ClassificationScheduler
 {
     private ClassificationQueueRepository $queueRepository;
     private ClassificationRunner $runner;
+    private int $defaultBatchSize;
 
     public function __construct(
         ClassificationQueueRepository $queueRepository,
-        ClassificationRunner $runner
+        ClassificationRunner $runner,
+        int $defaultBatchSize = 5
     ) {
         $this->queueRepository = $queueRepository;
         $this->runner = $runner;
+        $this->defaultBatchSize = max(1, $defaultBatchSize);
     }
 
     public function register(): void
@@ -57,7 +60,7 @@ final class ClassificationScheduler
 
     public function processCron(): void
     {
-        $this->runBatch();
+        $this->runBatch($this->defaultBatchSize);
     }
 
     /**
@@ -65,7 +68,7 @@ final class ClassificationScheduler
      */
     public function processCli(array $args = [], array $assocArgs = []): void
     {
-        $batch = isset($assocArgs['batch']) ? max(1, (int) $assocArgs['batch']) : 5;
+        $batch = isset($assocArgs['batch']) ? max(1, (int) $assocArgs['batch']) : $this->defaultBatchSize;
         $drain = isset($assocArgs['drain']);
 
         $totalProcessed = 0;
@@ -83,9 +86,10 @@ final class ClassificationScheduler
         }
     }
 
-    private function runBatch(int $batchSize = 5): int
+    private function runBatch(?int $batchSize = null): int
     {
-        $jobs = $this->queueRepository->claimBatch($batchSize);
+        $size = $batchSize !== null ? max(1, $batchSize) : $this->defaultBatchSize;
+        $jobs = $this->queueRepository->claimBatch($size);
         if (empty($jobs)) {
             return 0;
         }

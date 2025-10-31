@@ -11,16 +11,19 @@ final class ClassificationCommand
 {
     private ClassificationRunner $runner;
     private ?ClassificationQueueRepository $queueRepository;
+    private int $defaultLimit;
 
     public function __construct(
         PromptRepository $prompts,
         AiClientInterface $client,
         ?CategoryRepository $categories = null,
         ?ClassificationQueueRepository $queueRepository = null,
-        ?ClassificationRunner $runner = null
+        ?ClassificationRunner $runner = null,
+        int $defaultLimit = 5
     ) {
         $this->queueRepository = $queueRepository;
         $this->runner = $runner ?? new ClassificationRunner($prompts, $client, $categories, $queueRepository);
+        $this->defaultLimit = max(1, $defaultLimit);
     }
 
     public function register(): void
@@ -38,7 +41,7 @@ final class ClassificationCommand
      */
     public function handle(array $args, array $assocArgs): void
     {
-        $limit = isset($assocArgs['limit']) ? max(1, (int) $assocArgs['limit']) : 5;
+        $limit = isset($assocArgs['limit']) ? max(1, (int) $assocArgs['limit']) : $this->defaultLimit;
         $jobs = [];
 
         if (! empty($assocArgs['content'])) {

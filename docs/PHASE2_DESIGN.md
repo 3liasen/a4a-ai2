@@ -79,7 +79,8 @@
 2. [done] Add cron/WP-CLI runner configuration for automated job processing.
 3. [done] Enhance classification results UI (filters, detail view).
 4. [done] Expand tests for queue lifecycle using mocked OpenAI client.
-5. Add operational controls (model/timeout settings, CLI filters, retry toggles).
+5. [done] Add operational controls (model/timeout settings, CLI filters, retry toggles).
+
 
 
 

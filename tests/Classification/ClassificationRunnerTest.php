@@ -55,6 +55,7 @@ final class ClassificationRunnerTest extends TestCase
                 'category' => 'default',
                 'content' => 'Example snippet about accessibility.',
                 'url' => 'https://example.com',
+                'attempts' => 1,
             ],
         ]);
 
@@ -97,6 +98,7 @@ final class ClassificationRunnerTest extends TestCase
                 'id' => 6,
                 'category' => 'default',
                 'content' => 'Some snippet',
+                'attempts' => 1,
             ],
         ]);
 
@@ -104,5 +106,43 @@ final class ClassificationRunnerTest extends TestCase
         $update = $queueDb->updateLog[0];
         self::assertSame('pending', $update['data']['status']);
         self::assertSame('invalid response', $update['data']['last_error']);
+    }
+
+    public function testProcessStopsRetryWhenMaxAttemptsReached(): void
+    {
+        $promptDb = new \wpdb();
+        $promptDb->getRowQueue[] = [
+            'id' => 1,
+            'category' => 'default',
+            'template' => 'Answer yes or no: {{context}}',
+            'version' => 'v1',
+            'is_active' => 1,
+            'created_at' => '2024-01-01 00:00:00',
+            'updated_at' => '2024-01-01 00:00:00',
+        ];
+        $promptRepo = new PromptRepository($promptDb);
+
+        $aiClient = $this->createMock(AiClientInterface::class);
+        $aiClient->expects(self::once())
+            ->method('classify')
+            ->willThrowException(new RuntimeException('failure'));
+
+        $queueDb = new \wpdb();
+        $queueRepo = new ClassificationQueueRepository($queueDb);
+
+        $runner = new ClassificationRunner($promptRepo, $aiClient, null, $queueRepo, 2);
+
+        $runner->process([
+            [
+                'id' => 7,
+                'category' => 'default',
+                'content' => 'Snippet content',
+                'attempts' => 2,
+            ],
+        ]);
+
+        self::assertNotEmpty($queueDb->updateLog);
+        $update = $queueDb->updateLog[0];
+        self::assertSame('failed', $update['data']['status']);
     }
 }

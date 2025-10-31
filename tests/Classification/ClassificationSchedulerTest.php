@@ -35,6 +35,7 @@ final class ClassificationSchedulerTest extends TestCase
             'category' => 'default',
             'content' => 'Snippet',
             'prompt_version' => 'v1',
+            'attempts' => 1,
         ];
         $queueRepo = new ClassificationQueueRepository($queueDb);
 
@@ -44,7 +45,7 @@ final class ClassificationSchedulerTest extends TestCase
         );
 
         $runner = new ClassificationRunner($promptRepo, $aiClient, null, $queueRepo);
-        $scheduler = new ClassificationScheduler($queueRepo, $runner);
+        $scheduler = new ClassificationScheduler($queueRepo, $runner, 3);
         $scheduler->processCli([], ['batch' => 3]);
 
         self::assertNotEmpty($queueDb->updateLog);
@@ -73,6 +74,7 @@ final class ClassificationSchedulerTest extends TestCase
             'category' => 'default',
             'content' => 'Snippet',
             'prompt_version' => 'v1',
+            'attempts' => 1,
         ];
         $queueRepo = new ClassificationQueueRepository($queueDb);
 
@@ -82,10 +84,12 @@ final class ClassificationSchedulerTest extends TestCase
         );
 
         $runner = new ClassificationRunner($promptRepo, $aiClient, null, $queueRepo);
-        $scheduler = new ClassificationScheduler($queueRepo, $runner);
+        $scheduler = new ClassificationScheduler($queueRepo, $runner, 2);
         $scheduler->processCli([], ['batch' => 2, 'drain' => true]);
 
         self::assertCount(1, $queueDb->insertLog);
         self::assertGreaterThanOrEqual(1, count($queueDb->updateLog));
     }
 }
+
+

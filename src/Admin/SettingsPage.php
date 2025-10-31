@@ -48,13 +48,78 @@ final class SettingsPage
             'axs4all-ai',
             'axs4all_ai_api_section'
         );
+
+        add_settings_section(
+            'axs4all_ai_classification_section',
+            __('Classification Automation', 'axs4all-ai'),
+            static function (): void {
+                echo '<p>' . esc_html__('Configure how automated classification jobs interact with the AI provider.', 'axs4all-ai') . '</p>';
+            },
+            'axs4all-ai'
+        );
+
+        add_settings_field(
+            'axs4all_ai_model',
+            __('Model', 'axs4all-ai'),
+            [$this, 'renderModelField'],
+            'axs4all-ai',
+            'axs4all_ai_classification_section'
+        );
+
+        add_settings_field(
+            'axs4all_ai_timeout',
+            __('Request Timeout (seconds)', 'axs4all-ai'),
+            [$this, 'renderTimeoutField'],
+            'axs4all-ai',
+            'axs4all_ai_classification_section'
+        );
+
+        add_settings_field(
+            'axs4all_ai_batch_size',
+            __('Batch Size', 'axs4all-ai'),
+            [$this, 'renderBatchSizeField'],
+            'axs4all-ai',
+            'axs4all_ai_classification_section'
+        );
+
+        add_settings_field(
+            'axs4all_ai_max_attempts',
+            __('Max Attempts', 'axs4all-ai'),
+            [$this, 'renderMaxAttemptsField'],
+            'axs4all-ai',
+            'axs4all_ai_classification_section'
+        );
     }
 
     public function sanitize(array $input): array
     {
-        $output = get_option(self::OPTION_NAME, []);
-        $output['api_key'] = isset($input['api_key']) ? sanitize_text_field($input['api_key']) : '';
+        $existing = get_option(self::OPTION_NAME, []);
+        if (! is_array($existing)) {
+            $existing = [];
+        }
+
+        $output = $existing;
+
+        $submittedKey = isset($input['api_key']) ? (string) $input['api_key'] : '';
+        if ($submittedKey === '********' && isset($existing['api_key']) && $existing['api_key'] !== '') {
+            $output['api_key'] = (string) $existing['api_key'];
+        } else {
+            $output['api_key'] = sanitize_text_field($submittedKey);
+        }
         $output['api_key_source'] = $this->resolveApiKeySource($output['api_key']);
+
+        $output['model'] = isset($input['model']) && $input['model'] !== ''
+            ? sanitize_text_field((string) $input['model'])
+            : ($existing['model'] ?? 'gpt-4o-mini');
+
+        $timeout = isset($input['timeout']) ? (int) $input['timeout'] : ($existing['timeout'] ?? 30);
+        $output['timeout'] = max(5, min(300, $timeout));
+
+        $batchSize = isset($input['batch_size']) ? (int) $input['batch_size'] : ($existing['batch_size'] ?? 5);
+        $output['batch_size'] = max(1, min(50, $batchSize));
+
+        $maxAttempts = isset($input['max_attempts']) ? (int) $input['max_attempts'] : ($existing['max_attempts'] ?? 3);
+        $output['max_attempts'] = max(1, min(10, $maxAttempts));
 
         return $output;
     }
@@ -103,6 +168,59 @@ final class SettingsPage
         } elseif ($stored !== '') {
             echo '<p class="description">' . esc_html__('Database-stored key currently active.', 'axs4all-ai') . '</p>';
         }
+    }
+
+    public function renderModelField(): void
+    {
+        $options = get_option(self::OPTION_NAME, []);
+        $model = isset($options['model']) ? (string) $options['model'] : 'gpt-4o-mini';
+
+        printf(
+            '<input type="text" name="%1$s[model]" value="%2$s" class="regular-text" placeholder="%3$s" />',
+            esc_attr(self::OPTION_NAME),
+            esc_attr($model),
+            esc_attr__('e.g. gpt-4o-mini', 'axs4all-ai')
+        );
+        echo '<p class="description">' . esc_html__('Name of the OpenAI-compatible model used for classification.', 'axs4all-ai') . '</p>';
+    }
+
+    public function renderTimeoutField(): void
+    {
+        $options = get_option(self::OPTION_NAME, []);
+        $timeout = isset($options['timeout']) ? (int) $options['timeout'] : 30;
+
+        printf(
+            '<input type="number" name="%1$s[timeout]" value="%2$d" min="5" max="300" step="1" />',
+            esc_attr(self::OPTION_NAME),
+            $timeout
+        );
+        echo '<p class="description">' . esc_html__('Maximum number of seconds to wait for each OpenAI response.', 'axs4all-ai') . '</p>';
+    }
+
+    public function renderBatchSizeField(): void
+    {
+        $options = get_option(self::OPTION_NAME, []);
+        $batchSize = isset($options['batch_size']) ? (int) $options['batch_size'] : 5;
+
+        printf(
+            '<input type="number" name="%1$s[batch_size]" value="%2$d" min="1" max="50" step="1" />',
+            esc_attr(self::OPTION_NAME),
+            $batchSize
+        );
+        echo '<p class="description">' . esc_html__('Default number of jobs processed per automated batch.', 'axs4all-ai') . '</p>';
+    }
+
+    public function renderMaxAttemptsField(): void
+    {
+        $options = get_option(self::OPTION_NAME, []);
+        $maxAttempts = isset($options['max_attempts']) ? (int) $options['max_attempts'] : 3;
+
+        printf(
+            '<input type="number" name="%1$s[max_attempts]" value="%2$d" min="1" max="10" step="1" />',
+            esc_attr(self::OPTION_NAME),
+            $maxAttempts
+        );
+        echo '<p class="description">' . esc_html__('How many times a job may be retried after failures before being marked as failed permanently.', 'axs4all-ai') . '</p>';
     }
 
     private function resolveApiKeySource(string $submitted): string
