@@ -124,11 +124,11 @@ class ComposerStaticInitb7ad63eb032d9dd420b53f7692a94941
         ),
         'Axs4allAi\\Tests\\' => 
         array (
-            0 => 'Z:\\/tests',
+            0 => __DIR__ . '/../..' . '/tests',
         ),
         'Axs4allAi\\' => 
         array (
-            0 => 'Z:\\/src',
+            0 => __DIR__ . '/../..' . '/src',
         ),
     );
 

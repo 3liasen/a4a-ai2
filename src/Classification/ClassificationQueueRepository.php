@@ -172,7 +172,7 @@ final class ClassificationQueueRepository
 
         return $row !== null ? $row : null;
     }
-}
+
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -190,3 +190,4 @@ final class ClassificationQueueRepository
         $rows = $this->wpdb->get_results($sql, ARRAY_A);
         return is_array($rows) ? $rows : [];
     }
+}
