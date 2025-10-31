@@ -116,4 +116,97 @@ final class ClassificationQueueRepositoryTest extends TestCase
         $repository = new ClassificationQueueRepository($wpdb);
         $repository->markFailed(['id' => 3], '<script>alert("bad")</script> Alert <b>script</b> bad');
     }
+
+    public function testGetResultsAppliesFiltersAndPagination(): void
+    {
+        $wpdb = new \wpdb();
+        $wpdb->getResultsQueue[] = [
+            [
+                'id' => 1,
+                'queue_id' => 10,
+                'decision' => 'yes',
+                'model' => 'gpt',
+                'prompt_version' => 'v1',
+                'raw_response' => '{"decision":"yes"}',
+                'tokens_prompt' => 11,
+                'tokens_completion' => 2,
+                'duration_ms' => 40,
+                'created_at' => '2024-01-15 10:00:00',
+                'source_url' => 'https://example.com',
+                'category' => 'museum',
+                'confidence' => 0.9,
+            ],
+        ];
+
+        $repository = new ClassificationQueueRepository($wpdb);
+        $filters = [
+            'decision' => 'yes',
+            'model' => 'gpt',
+            'prompt_version' => 'v1',
+            'created_start' => '2024-01-01',
+            'created_end' => '2024-01-31',
+            'search' => 'example',
+        ];
+
+        $results = $repository->getResults($filters, 15, 2);
+
+        self::assertCount(1, $results);
+        self::assertSame('https://example.com', $results[0]['source_url']);
+
+        $prepareLogs = array_values(array_filter(
+            $wpdb->queryLog,
+            static fn(array $entry): bool => $entry['type'] === 'prepare'
+        ));
+
+        self::assertNotEmpty($prepareLogs);
+        $lastPrepare = end($prepareLogs);
+        self::assertSame('yes', $lastPrepare['args'][0]);
+        self::assertSame('gpt', $lastPrepare['args'][1]);
+        self::assertSame('v1', $lastPrepare['args'][2]);
+        self::assertSame('2024-01-01 00:00:00', $lastPrepare['args'][3]);
+        self::assertSame('2024-01-31 23:59:59', $lastPrepare['args'][4]);
+        self::assertSame('%example%', $lastPrepare['args'][5]);
+        self::assertSame('%example%', $lastPrepare['args'][6]);
+        self::assertSame(15, $lastPrepare['args'][7]);
+        self::assertSame(15, $lastPrepare['args'][8]);
+    }
+
+    public function testCountResultsUsesFilters(): void
+    {
+        $wpdb = new \wpdb();
+        $wpdb->getVarQueue[] = 42;
+
+        $repository = new ClassificationQueueRepository($wpdb);
+        $count = $repository->countResults(['decision' => 'no']);
+
+        self::assertSame(42, $count);
+
+        $prepareLogs = array_values(array_filter(
+            $wpdb->queryLog,
+            static fn(array $entry): bool => $entry['type'] === 'prepare'
+        ));
+
+        self::assertNotEmpty($prepareLogs);
+        $lastPrepare = end($prepareLogs);
+        self::assertSame('no', $lastPrepare['args'][0]);
+    }
+
+    public function testGetResultReturnsRow(): void
+    {
+        $wpdb = new \wpdb();
+        $wpdb->getRowQueue[] = [
+            'id' => 9,
+            'queue_id' => 2,
+            'decision' => 'yes',
+            'raw_response' => '{"decision":"yes"}',
+            'source_url' => 'https://example.com',
+        ];
+
+        $repository = new ClassificationQueueRepository($wpdb);
+        $row = $repository->getResult(9);
+
+        self::assertNotNull($row);
+        self::assertSame(9, $row['id']);
+        self::assertSame('https://example.com', $row['source_url']);
+    }
 }

@@ -178,16 +178,169 @@ final class ClassificationQueueRepository
      */
     public function getRecentResults(int $limit = 50): array
     {
-        $limit = max(1, $limit);
+        return $this->getResults([], $limit, 1);
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<int, array<string, mixed>>
+     */
+    public function getResults(array $filters = [], int $perPage = 20, int $page = 1): array
+    {
+        $perPage = max(1, min(100, (int) $perPage));
+        $page = max(1, (int) $page);
+        $offset = ($page - 1) * $perPage;
+
+        [$whereClause, $params] = $this->buildFilterClause($filters);
+        $params[] = $perPage;
+        $params[] = $offset;
+
+        $sql = "
+            SELECT r.*, q.source_url, q.category
+            FROM {$this->resultsTable} r
+            LEFT JOIN {$this->queueTable} q ON q.id = r.queue_id
+            WHERE 1=1 {$whereClause}
+            ORDER BY r.created_at DESC
+            LIMIT %d OFFSET %d
+        ";
+
+        $prepared = $this->prepare($sql, $params);
+        $rows = $this->wpdb->get_results($prepared, ARRAY_A);
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     */
+    public function countResults(array $filters = []): int
+    {
+        [$whereClause, $params] = $this->buildFilterClause($filters);
+
+        $sql = "
+            SELECT COUNT(*)
+            FROM {$this->resultsTable} r
+            LEFT JOIN {$this->queueTable} q ON q.id = r.queue_id
+            WHERE 1=1 {$whereClause}
+        ";
+
+        $prepared = $this->prepare($sql, $params);
+        $count = $this->wpdb->get_var($prepared);
+
+        return (int) $count;
+    }
+
+    public function getResult(int $id): ?array
+    {
         $sql = $this->wpdb->prepare(
-            "SELECT id, queue_id, extraction_id, decision, confidence, prompt_version, model, tokens_prompt, tokens_completion, duration_ms, created_at
-             FROM {$this->resultsTable}
-             ORDER BY created_at DESC
-             LIMIT %d",
-            $limit
+            "
+            SELECT r.*, q.source_url, q.category, q.content
+            FROM {$this->resultsTable} r
+            LEFT JOIN {$this->queueTable} q ON q.id = r.queue_id
+            WHERE r.id = %d
+            LIMIT 1
+            ",
+            $id
         );
 
-        $rows = $this->wpdb->get_results($sql, ARRAY_A);
-        return is_array($rows) ? $rows : [];
+        $row = $this->wpdb->get_row($sql, ARRAY_A);
+
+        return $row !== null ? $row : null;
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array{0:string,1:array<int, mixed>}
+     */
+    private function buildFilterClause(array $filters): array
+    {
+        $clauses = [];
+        $params = [];
+
+        $decision = isset($filters['decision']) ? strtolower((string) $filters['decision']) : '';
+        if ($decision !== '' && in_array($decision, ['yes', 'no'], true)) {
+            $clauses[] = 'AND r.decision = %s';
+            $params[] = $decision;
+        }
+
+        $model = isset($filters['model']) ? trim((string) $filters['model']) : '';
+        if ($model !== '') {
+            $clauses[] = 'AND r.model = %s';
+            $params[] = $model;
+        }
+
+        $promptVersion = isset($filters['prompt_version']) ? trim((string) $filters['prompt_version']) : '';
+        if ($promptVersion !== '') {
+            $clauses[] = 'AND r.prompt_version = %s';
+            $params[] = $promptVersion;
+        }
+
+        if (! empty($filters['queue_id']) && is_numeric($filters['queue_id'])) {
+            $clauses[] = 'AND r.queue_id = %d';
+            $params[] = (int) $filters['queue_id'];
+        }
+
+        $createdStart = isset($filters['created_start']) ? trim((string) $filters['created_start']) : '';
+        if ($createdStart !== '') {
+            $start = $this->normalizeDate($createdStart, false);
+            if ($start !== null) {
+                $clauses[] = 'AND r.created_at >= %s';
+                $params[] = $start;
+            }
+        }
+
+        $createdEnd = isset($filters['created_end']) ? trim((string) $filters['created_end']) : '';
+        if ($createdEnd !== '') {
+            $end = $this->normalizeDate($createdEnd, true);
+            if ($end !== null) {
+                $clauses[] = 'AND r.created_at <= %s';
+                $params[] = $end;
+            }
+        }
+
+        $search = isset($filters['search']) ? trim((string) $filters['search']) : '';
+        if ($search !== '') {
+            $like = '%' . esc_like($search) . '%';
+            $clauses[] = 'AND (r.raw_response LIKE %s OR q.source_url LIKE %s)';
+            $params[] = $like;
+            $params[] = $like;
+
+            if (ctype_digit($search)) {
+                $clauses[] = 'AND r.queue_id = %d';
+                $params[] = (int) $search;
+            }
+        }
+
+        return [implode(' ', $clauses), $params];
+    }
+
+    private function normalizeDate(string $date, bool $endOfDay): ?string
+    {
+        $dateTime = date_create_immutable($date);
+        if (! $dateTime) {
+            return null;
+        }
+
+        if ($endOfDay) {
+            $dateTime = $dateTime->setTime(23, 59, 59);
+        } else {
+            $dateTime = $dateTime->setTime(0, 0, 0);
+        }
+
+        return $dateTime->format('Y-m-d H:i:s');
+    }
+
+    /**
+     * @param array<int, mixed> $params
+     */
+    private function prepare(string $sql, array $params): string
+    {
+        if (empty($params)) {
+            return $sql;
+        }
+
+        $arguments = array_merge([$sql], $params);
+
+        return (string) call_user_func_array([$this->wpdb, 'prepare'], $arguments);
     }
 }

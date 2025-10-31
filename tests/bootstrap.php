@@ -40,6 +40,13 @@ if (! function_exists('sanitize_text_field')) {
     }
 }
 
+if (! function_exists('esc_like')) {
+    function esc_like(string $text): string
+    {
+        return addslashes(str_replace(['%', '_'], ['\\%', '\\_'], $text));
+    }
+}
+
 if (! function_exists('wp_strip_all_tags')) {
     function wp_strip_all_tags(string $value): string
     {
