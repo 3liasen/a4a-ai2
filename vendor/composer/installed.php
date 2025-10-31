@@ -3,7 +3,7 @@
         'name' => 'sevenyellowmonkeys/axs4all-ai',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => 'e1e1f3f9f817049ccee8b7113862bafc25537801',
+        'reference' => 'c4840e39b7366d630a5ebc9f9ba0de23924979f0',
         'type' => 'wordpress-plugin',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -346,7 +346,7 @@
         'sevenyellowmonkeys/axs4all-ai' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => 'e1e1f3f9f817049ccee8b7113862bafc25537801',
+            'reference' => 'c4840e39b7366d630a5ebc9f9ba0de23924979f0',
             'type' => 'wordpress-plugin',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
