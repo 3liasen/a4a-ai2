@@ -54,7 +54,7 @@ final class Plugin
         $this->aiClient = new OpenAiClient(
             $apiKey,
             $this->settings['model'],
-            0.0,
+            $this->settings['temperature'],
             null,
             null,
             (float) $this->settings['timeout']
@@ -174,6 +174,7 @@ final class Plugin
 
         return [
             'model' => $model,
+            'temperature' => isset($options['temperature']) ? max(0.0, min(2.0, (float) $options['temperature'])) : 0.0,
             'timeout' => $timeout,
             'batch_size' => $batchSize,
             'max_attempts' => $maxAttempts,

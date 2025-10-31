@@ -67,6 +67,14 @@ final class SettingsPage
         );
 
         add_settings_field(
+            'axs4all_ai_temperature',
+            __('Temperature', 'axs4all-ai'),
+            [$this, 'renderTemperatureField'],
+            'axs4all-ai',
+            'axs4all_ai_classification_section'
+        );
+
+        add_settings_field(
             'axs4all_ai_timeout',
             __('Request Timeout (seconds)', 'axs4all-ai'),
             [$this, 'renderTimeoutField'],
@@ -111,6 +119,9 @@ final class SettingsPage
         $output['model'] = isset($input['model']) && $input['model'] !== ''
             ? sanitize_text_field((string) $input['model'])
             : ($existing['model'] ?? 'gpt-4o-mini');
+
+        $temperature = isset($input['temperature']) ? (float) $input['temperature'] : ($existing['temperature'] ?? 0.0);
+        $output['temperature'] = max(0.0, min(2.0, $temperature));
 
         $timeout = isset($input['timeout']) ? (int) $input['timeout'] : ($existing['timeout'] ?? 30);
         $output['timeout'] = max(5, min(300, $timeout));
@@ -182,6 +193,19 @@ final class SettingsPage
             esc_attr__('e.g. gpt-4o-mini', 'axs4all-ai')
         );
         echo '<p class="description">' . esc_html__('Name of the OpenAI-compatible model used for classification.', 'axs4all-ai') . '</p>';
+    }
+
+    public function renderTemperatureField(): void
+    {
+        $options = get_option(self::OPTION_NAME, []);
+        $temperature = isset($options['temperature']) ? (float) $options['temperature'] : 0.0;
+
+        printf(
+            '<input type="number" name="%1$s[temperature]" value="%2$s" min="0" max="2" step="0.1" />',
+            esc_attr(self::OPTION_NAME),
+            esc_attr((string) $temperature)
+        );
+        echo '<p class="description">' . esc_html__('Controls response randomness. Use 0 for deterministic outputs; higher values increase variation (max 2).', 'axs4all-ai') . '</p>';
     }
 
     public function renderTimeoutField(): void
