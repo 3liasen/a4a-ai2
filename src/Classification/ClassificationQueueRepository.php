@@ -267,6 +267,39 @@ final class ClassificationQueueRepository
         return (int) $count;
     }
 
+    /**
+     * @param array<string,mixed> $filters
+     * @return array<string,int>
+     */
+    public function getTokenTotals(array $filters = []): array
+    {
+        [$whereClause, $params] = $this->buildFilterClause($filters);
+
+        $sql = "
+            SELECT
+                COALESCE(SUM(r.tokens_prompt), 0) AS prompt_tokens,
+                COALESCE(SUM(r.tokens_completion), 0) AS completion_tokens
+            FROM {$this->resultsTable} r
+            LEFT JOIN {$this->queueTable} cq
+                ON cq.queue_id = r.queue_id
+                AND (
+                    (cq.category_id > 0 AND cq.category_id = r.category_id)
+                    OR (cq.category_id = 0 AND (r.category_id IS NULL OR r.category_id = 0))
+                )
+                AND cq.prompt_version = r.prompt_version
+            LEFT JOIN {$this->crawlTable} queue ON queue.id = r.queue_id
+            WHERE 1=1 {$whereClause}
+        ";
+
+        $prepared = $this->prepare($sql, $params);
+        $row = $this->wpdb->get_row($prepared, ARRAY_A);
+
+        return [
+            'prompt_tokens' => isset($row['prompt_tokens']) ? (int) $row['prompt_tokens'] : 0,
+            'completion_tokens' => isset($row['completion_tokens']) ? (int) $row['completion_tokens'] : 0,
+        ];
+    }
+
     public function getResult(int $id): ?array
     {
         $sql = $this->wpdb->prepare(
