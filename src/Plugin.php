@@ -63,7 +63,6 @@ final class Plugin
             $this->promptRepository,
             $this->aiClient,
             $this->categoryRepository,
-            $this->clientRepository,
             $this->classificationQueueRepository,
             $this->settings['max_attempts']
         );

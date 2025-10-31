@@ -47,7 +47,7 @@ final class ClassificationRunnerTest extends TestCase
         $queueDb = new \wpdb();
         $queueRepo = new ClassificationQueueRepository($queueDb);
 
-        $runner = new ClassificationRunner($promptRepo, $aiClient, $categoryRepo, null, $queueRepo);
+        $runner = new ClassificationRunner($promptRepo, $aiClient, $categoryRepo, $queueRepo);
 
         $runner->process([
             [
@@ -91,7 +91,7 @@ final class ClassificationRunnerTest extends TestCase
         $queueDb = new \wpdb();
         $queueRepo = new ClassificationQueueRepository($queueDb);
 
-        $runner = new ClassificationRunner($promptRepo, $aiClient, null, null, $queueRepo);
+        $runner = new ClassificationRunner($promptRepo, $aiClient, null, $queueRepo);
 
         $runner->process([
             [
@@ -130,7 +130,7 @@ final class ClassificationRunnerTest extends TestCase
         $queueDb = new \wpdb();
         $queueRepo = new ClassificationQueueRepository($queueDb);
 
-        $runner = new ClassificationRunner($promptRepo, $aiClient, null, null, $queueRepo, 2);
+        $runner = new ClassificationRunner($promptRepo, $aiClient, null, $queueRepo, 2);
 
         $runner->process([
             [

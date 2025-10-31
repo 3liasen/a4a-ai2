@@ -45,11 +45,7 @@ final class ClientRepositoryTest extends TestCase
         self::assertSame(5, $client['id']);
         self::assertSame('https://example.com', $client['matched_url']);
         self::assertCount(1, $client['urls']);
-        self::assertArrayHasKey(12, $client['categories']);
-        self::assertSame(
-            ['prompt' => 'Additional info', 'phrases' => ['foo']],
-            $client['categories'][12]
-        );
+        self::assertContains(12, $client['categories']);
     }
 
     public function testGetCategoryAssignmentsReturnsDecodedOverrides(): void
@@ -70,8 +66,6 @@ final class ClientRepositoryTest extends TestCase
         $assignments = $repository->getCategoryAssignments(10);
 
         self::assertCount(2, $assignments);
-        self::assertSame(3, $assignments[0]['category_id']);
-        self::assertSame(['phrases' => ['alpha', 'beta']], $assignments[0]['overrides']);
-        self::assertSame([], $assignments[1]['overrides']);
+        self::assertSame([3, 4], $assignments);
     }
 }

@@ -7,36 +7,28 @@ namespace Axs4allAi\Classification;
 use Axs4allAi\Ai\AiClientInterface;
 use Axs4allAi\Ai\Dto\PromptContext;
 use Axs4allAi\Category\CategoryRepository;
-use Axs4allAi\Data\ClientRepository;
 final class ClassificationRunner
 {
     private PromptRepository $prompts;
     private AiClientInterface $client;
     private ?CategoryRepository $categories;
-    private ?ClientRepository $clients;
     private ?ClassificationQueueRepository $queueRepository;
     private ?int $maxAttempts;
     /** @var array<int, array<string, mixed>|null> */
     private array $categoryCacheById = [];
     /** @var array<string, array<string, mixed>|null> */
     private array $categoryCacheByName = [];
-    /** @var array<int, array<string, mixed>|null> */
-    private array $clientCache = [];
-    /** @var array<string, array<string, mixed>> */
-    private array $clientCategoryOverrides = [];
 
     public function __construct(
         PromptRepository $prompts,
         AiClientInterface $client,
         ?CategoryRepository $categories = null,
-        ?ClientRepository $clients = null,
         ?ClassificationQueueRepository $queueRepository = null,
         ?int $maxAttempts = null
     ) {
         $this->prompts = $prompts;
         $this->client = $client;
         $this->categories = $categories;
-        $this->clients = $clients;
         $this->queueRepository = $queueRepository;
         $this->maxAttempts = ($maxAttempts !== null && $maxAttempts > 0) ? $maxAttempts : null;
     }
@@ -83,26 +75,6 @@ final class ClassificationRunner
         $categoryPhrases = $this->sanitizeStringList($categoryData['phrases'] ?? []);
         $basePrompt = isset($categoryData['base_prompt']) ? (string) $categoryData['base_prompt'] : '';
 
-        $clientName = '';
-        $clientPrompt = '';
-        $clientPhrases = [];
-        if ($clientId > 0) {
-            $client = $this->getClient($clientId);
-            if ($client !== null) {
-                $clientName = isset($client['name']) ? (string) $client['name'] : '';
-            }
-            if ($resolvedCategoryId > 0) {
-                $overrides = $this->getClientOverrides($clientId, $resolvedCategoryId);
-                if (! empty($overrides['prompt'])) {
-                    $clientPrompt = (string) $overrides['prompt'];
-                }
-                if (! empty($overrides['phrases'])) {
-                    $clientPhrases = $this->sanitizeStringList($overrides['phrases']);
-                }
-            }
-        }
-
-        $allPhrases = $this->mergeUniqueLists($categoryPhrases, $clientPhrases);
         $metadata = $this->buildMetadata(
             $job,
             $resolvedCategoryName,
@@ -110,10 +82,8 @@ final class ClassificationRunner
             $decisionSet,
             $categoryOptions,
             $categoryKeywords,
-            $allPhrases,
-            $basePrompt,
-            $clientPrompt,
-            $clientName
+            $categoryPhrases,
+            $basePrompt
         );
 
         $template = $this->prompts->getActiveTemplate($resolvedCategoryName);
@@ -221,36 +191,6 @@ final class ClassificationRunner
     /**
      * @return array<string, mixed>|null
      */
-    private function getClient(int $clientId): ?array
-    {
-        if ($clientId <= 0 || ! $this->clients instanceof ClientRepository) {
-            return null;
-        }
-
-        if (! array_key_exists($clientId, $this->clientCache)) {
-            $this->clientCache[$clientId] = $this->clients->find($clientId);
-        }
-
-        return $this->clientCache[$clientId] ?? null;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function getClientOverrides(int $clientId, int $categoryId): array
-    {
-        if ($clientId <= 0 || $categoryId <= 0 || ! $this->clients instanceof ClientRepository) {
-            return [];
-        }
-
-        $cacheKey = $clientId . ':' . $categoryId;
-        if (! isset($this->clientCategoryOverrides[$cacheKey])) {
-            $this->clientCategoryOverrides[$cacheKey] = $this->clients->getCategoryOverrides($clientId, $categoryId);
-        }
-
-        return $this->clientCategoryOverrides[$cacheKey];
-    }
-
     /**
      * @param mixed $values
      * @return array<int, string>
@@ -277,21 +217,6 @@ final class ClassificationRunner
     }
 
     /**
-     * @param array<int, string> $primary
-     * @param array<int, string> $secondary
-     * @return array<int, string>
-     */
-    private function mergeUniqueLists(array $primary, array $secondary): array
-    {
-        $merged = [];
-        foreach (array_merge($primary, $secondary) as $value) {
-            $merged[$value] = $value;
-        }
-
-        return array_values($merged);
-    }
-
-    /**
      * @param array<string, mixed> $job
      * @param array<int, string> $decisionOptions
      * @param array<int, string> $features
@@ -307,9 +232,7 @@ final class ClassificationRunner
         array $features,
         array $keywords,
         array $phrases,
-        string $categoryPrompt,
-        string $clientPrompt,
-        string $clientName
+        string $categoryPrompt
     ): array {
         $metadata = [
             'category' => $categoryName,
@@ -318,7 +241,7 @@ final class ClassificationRunner
             'decision_options' => implode(', ', $decisionOptions),
             'decision_options_raw' => implode('|', $decisionOptions),
             'decision_set' => $decisionSet,
-            'category_prompt' => $this->composePrompt($categoryPrompt, $clientPrompt, $decisionOptions),
+            'category_prompt' => $this->composePrompt($categoryPrompt, $decisionOptions),
             'category_keywords' => ! empty($keywords) ? implode(', ', $keywords) : '',
             'category_phrases' => ! empty($phrases) ? implode("\n", $phrases) : '',
         ];
@@ -327,29 +250,20 @@ final class ClassificationRunner
             $metadata['category_options'] = implode(', ', $features);
         }
 
-        if ($clientName !== '') {
-            $metadata['client_name'] = $clientName;
-        }
-
         return $metadata;
     }
 
     /**
      * @param array<int, string> $decisionOptions
      */
-    private function composePrompt(string $categoryPrompt, string $clientPrompt, array $decisionOptions): string
+    private function composePrompt(string $categoryPrompt, array $decisionOptions): string
     {
         $segments = [];
 
         $categoryPrompt = trim($categoryPrompt);
-        $clientPrompt = trim($clientPrompt);
 
         if ($categoryPrompt !== '') {
             $segments[] = $categoryPrompt;
-        }
-
-        if ($clientPrompt !== '') {
-            $segments[] = $clientPrompt;
         }
 
         $segments[] = sprintf(

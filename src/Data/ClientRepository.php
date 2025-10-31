@@ -72,10 +72,10 @@ final class ClientRepository
             $urls
         );
 
-        $client['categories'] = [];
-        foreach ($categories as $row) {
-            $client['categories'][(int) $row['category_id']] = $this->decodeOverrides($row['overrides'] ?? null);
-        }
+        $client['categories'] = array_map(
+            static fn(array $row): int => (int) $row['category_id'],
+            $categories
+        );
 
         return $client;
     }
@@ -170,27 +170,17 @@ final class ClientRepository
     }
 
     /**
-     * @param array<int, array<string, mixed>> $categoryData keyed by category_id
+     * @param array<int, int> $categoryIds
      */
-    public function saveCategories(int $clientId, array $categoryData): void
+    public function saveCategories(int $clientId, array $categoryIds): void
     {
         $this->wpdb->delete($this->pivotTable, ['client_id' => $clientId], ['%d']);
 
         $now = current_time('mysql');
-        foreach ($categoryData as $categoryId => $overrides) {
-            $categoryId = (int) $categoryId;
+        $unique = array_unique(array_map('intval', $categoryIds));
+        foreach ($unique as $categoryId) {
             if ($categoryId <= 0) {
                 continue;
-            }
-
-            $payload = [];
-            if (is_array($overrides) && ! empty($overrides)) {
-                $payload = [
-                    'phrases' => isset($overrides['phrases']) && is_array($overrides['phrases'])
-                        ? array_values(array_filter(array_map('sanitize_text_field', $overrides['phrases'])))
-                        : [],
-                    'prompt' => isset($overrides['prompt']) ? sanitize_textarea_field((string) $overrides['prompt']) : '',
-                ];
             }
 
             $this->wpdb->insert(
@@ -198,7 +188,7 @@ final class ClientRepository
                 [
                     'client_id' => $clientId,
                     'category_id' => $categoryId,
-                    'overrides' => ! empty($payload) ? wp_json_encode($payload) : null,
+                    'overrides' => null,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ],
@@ -242,9 +232,7 @@ final class ClientRepository
         return $client;
     }
 
-    /**
-     * @return array<int, array{category_id:int, overrides:array<string, mixed>}>
-     */
+    /** @return array<int, int> */
     public function getCategoryAssignments(int $clientId): array
     {
         $rows = $this->wpdb->get_results(
@@ -255,36 +243,10 @@ final class ClientRepository
             ARRAY_A
         ) ?: [];
 
-        $assignments = [];
-        foreach ($rows as $row) {
-            $assignments[] = [
-                'category_id' => (int) $row['category_id'],
-                'overrides' => $this->decodeOverrides($row['overrides'] ?? null),
-            ];
-        }
-
-        return $assignments;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function getCategoryOverrides(int $clientId, int $categoryId): array
-    {
-        $row = $this->wpdb->get_row(
-            $this->wpdb->prepare(
-                "SELECT overrides FROM {$this->pivotTable} WHERE client_id = %d AND category_id = %d LIMIT 1",
-                $clientId,
-                $categoryId
-            ),
-            ARRAY_A
+        return array_map(
+            static fn(array $row): int => (int) $row['category_id'],
+            $rows
         );
-
-        if (! $row || ! isset($row['overrides'])) {
-            return [];
-        }
-
-        return $this->decodeOverrides($row['overrides']);
     }
 
     /**
@@ -313,25 +275,6 @@ final class ClientRepository
     {
         $status = strtolower(trim($status));
         return in_array($status, ['active', 'inactive'], true) ? $status : 'active';
-    }
-
-    /**
-     * @param mixed $payload
-     * @return array<string, mixed>
-     */
-    private function decodeOverrides($payload): array
-    {
-        if (empty($payload)) {
-            return [];
-        }
-
-        if (is_array($payload)) {
-            return $payload;
-        }
-
-        $decoded = json_decode((string) $payload, true);
-
-        return is_array($decoded) ? $decoded : [];
     }
 
     private function normalizeUrl(string $url): string

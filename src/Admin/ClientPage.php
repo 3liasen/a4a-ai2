@@ -198,24 +198,12 @@ final class ClientPage
                                             <?php
                                             $selectedCategories = $client['categories'] ?? [];
                                             foreach ($categories as $category) :
-                                                $isChecked = array_key_exists($category['id'], $selectedCategories);
-                                                $overridePrompt = $isChecked ? ($selectedCategories[$category['id']]['prompt'] ?? '') : '';
-                                                $overridePhrases = $isChecked ? ($selectedCategories[$category['id']]['phrases'] ?? []) : [];
+                                                $isChecked = in_array((int) $category['id'], $selectedCategories, true);
                                                 ?>
                                                 <label style="display:block; margin-bottom:0.5rem;">
-                                                    <input type="checkbox" name="client_categories[<?php echo esc_attr((string) $category['id']); ?>][enabled]" value="1" <?php checked($isChecked); ?>>
+                                                    <input type="checkbox" name="client_categories[]" value="<?php echo esc_attr((string) $category['id']); ?>" <?php checked($isChecked); ?>>
                                                     <?php echo esc_html($category['name']); ?>
                                                 </label>
-                                                <div style="margin:0 0 1rem 1.5rem;">
-                                                    <label>
-                                                        <?php esc_html_e('Prompt override', 'axs4all-ai'); ?>
-                                                        <textarea name="client_categories[<?php echo esc_attr((string) $category['id']); ?>][prompt]" rows="3" class="large-text code"><?php echo esc_textarea($overridePrompt); ?></textarea>
-                                                    </label>
-                                                    <label>
-                                                        <?php esc_html_e('Additional phrases (one per line)', 'axs4all-ai'); ?>
-                                                        <textarea name="client_categories[<?php echo esc_attr((string) $category['id']); ?>][phrases]" rows="2" class="large-text code"><?php echo esc_textarea(implode("\n", $overridePhrases)); ?></textarea>
-                                                    </label>
-                                                </div>
                                             <?php endforeach; ?>
                                         </fieldset>
                                     <?php endif; ?>
@@ -266,19 +254,10 @@ final class ClientPage
         $urls = isset($_POST['client_urls']) && is_array($_POST['client_urls']) ? array_map('wp_unslash', (array) $_POST['client_urls']) : [];
         $this->clients->saveUrls($clientId, $urls);
 
-        $categoryInput = isset($_POST['client_categories']) && is_array($_POST['client_categories']) ? $_POST['client_categories'] : [];
-        $categoryPayload = [];
-        foreach ($categoryInput as $categoryId => $data) {
-            if (empty($data['enabled'])) {
-                continue;
-            }
-            $phrasesRaw = isset($data['phrases']) ? (string) wp_unslash($data['phrases']) : '';
-            $categoryPayload[$categoryId] = [
-                'prompt' => isset($data['prompt']) ? (string) wp_unslash($data['prompt']) : '',
-                'phrases' => array_filter(array_map('trim', preg_split("/\r\n|\r|\n/", $phrasesRaw) ?: [])),
-            ];
-        }
-        $this->clients->saveCategories($clientId, $categoryPayload);
+        $categoryInput = isset($_POST['client_categories']) && is_array($_POST['client_categories'])
+            ? array_map('intval', array_map('wp_unslash', (array) $_POST['client_categories']))
+            : [];
+        $this->clients->saveCategories($clientId, $categoryInput);
 
         $this->redirectWithMessage($messageParam, $message, ['edit_client' => null]);
     }

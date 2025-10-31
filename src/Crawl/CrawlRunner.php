@@ -138,10 +138,7 @@ final class CrawlRunner
         error_log('[axs4all-ai] Crawl runner stub finished.');
     }
 
-    /**
-     * @param array<string, mixed>|null $client
-     * @return array<int, array<string, mixed>>
-     */
+    /** @param array<string, mixed>|null $client */
     private function determineCategoryAssignments(string $fallbackCategory, ?array $client): array
     {
         $assignments = [];
@@ -149,8 +146,8 @@ final class CrawlRunner
         if ($client !== null && $this->clients instanceof ClientRepository) {
             $clientId = isset($client['id']) ? (int) $client['id'] : 0;
             if ($clientId > 0) {
-                foreach ($this->clients->getCategoryAssignments($clientId) as $row) {
-                    $category = $this->resolveCategoryById($row['category_id']);
+                foreach ($this->clients->getCategoryAssignments($clientId) as $categoryId) {
+                    $category = $this->resolveCategoryById($categoryId);
                     if ($category === null) {
                         continue;
                     }
