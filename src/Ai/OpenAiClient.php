@@ -49,12 +49,13 @@ final class OpenAiClient implements AiClientInterface
         }
 
         $prompt = $this->buildPrompt($context);
+        $allowedOptions = $this->extractAllowedOptions($context->metadata());
         $startedAt = microtime(true);
 
         if ($this->httpClient !== null) {
-            $rawBody = $this->sendWithHttpClient($prompt);
+            $rawBody = $this->sendWithHttpClient($prompt, $allowedOptions);
         } else {
-            $rawBody = $this->sendWithWpHttp($prompt);
+            $rawBody = $this->sendWithWpHttp($prompt, $allowedOptions);
         }
 
         $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
@@ -64,7 +65,7 @@ final class OpenAiClient implements AiClientInterface
         }
 
         $content = $this->extractContent($data);
-        $decision = $this->parseDecision($content);
+        $decision = $this->parseDecision($content, $allowedOptions);
 
         $usage = isset($data['usage']) && is_array($data['usage']) ? $data['usage'] : [];
         $metrics = [
@@ -92,7 +93,10 @@ final class OpenAiClient implements AiClientInterface
         return strtr($template, $replacements);
     }
 
-    private function sendWithHttpClient(string $prompt): string
+    /**
+     * @param array<int, string> $allowedOptions
+     */
+    private function sendWithHttpClient(string $prompt, array $allowedOptions): string
     {
         if (! method_exists($this->httpClient, 'send')) {
             throw new RuntimeException('Configured HTTP client does not support send().');
@@ -109,7 +113,7 @@ final class OpenAiClient implements AiClientInterface
                 'Authorization' => 'Bearer ' . $this->apiKey,
                 'Content-Type' => 'application/json',
             ],
-            $this->buildJsonPayload($prompt)
+            $this->buildJsonPayload($prompt, $allowedOptions)
         );
 
         try {
@@ -121,13 +125,16 @@ final class OpenAiClient implements AiClientInterface
         return (string) $response->getBody();
     }
 
-    private function sendWithWpHttp(string $prompt): string
+    /**
+     * @param array<int, string> $allowedOptions
+     */
+    private function sendWithWpHttp(string $prompt, array $allowedOptions): string
     {
         if (! function_exists('wp_remote_post')) {
             throw new RuntimeException('HTTP client not available and wp_remote_post is undefined.');
         }
 
-        $json = $this->buildJsonPayload($prompt);
+        $json = $this->buildJsonPayload($prompt, $allowedOptions);
         $args = [
             'headers' => [
                 'Authorization' => 'Bearer ' . $this->apiKey,
@@ -150,8 +157,16 @@ final class OpenAiClient implements AiClientInterface
         return $body;
     }
 
-    private function buildJsonPayload(string $prompt): string
+    /**
+     * @param array<int, string> $allowedOptions
+     */
+    private function buildJsonPayload(string $prompt, array $allowedOptions): string
     {
+        $instruction = 'You are an accessibility compliance assistant. Respond with exactly one lowercase value from the provided decision options.';
+        if (! empty($allowedOptions)) {
+            $instruction .= ' Allowed options: ' . implode(', ', $allowedOptions) . '.';
+        }
+
         $payload = [
             'model' => $this->model,
             'temperature' => $this->temperature,
@@ -159,7 +174,7 @@ final class OpenAiClient implements AiClientInterface
             'messages' => [
                 [
                     'role' => 'system',
-                    'content' => 'You are an accessibility compliance assistant. Answer strictly with the single word "yes" or "no" in lowercase.',
+                    'content' => $instruction,
                 ],
                 [
                     'role' => 'user',
@@ -193,7 +208,10 @@ final class OpenAiClient implements AiClientInterface
         return $content;
     }
 
-    private function parseDecision(string $content): string
+    /**
+     * @param array<int, string> $allowedOptions
+     */
+    private function parseDecision(string $content, array $allowedOptions = []): string
     {
         $normalized = strtolower(trim($content));
         $normalized = preg_replace('/[^a-z]/', ' ', $normalized);
@@ -209,10 +227,42 @@ final class OpenAiClient implements AiClientInterface
         }
 
         $word = strtolower($word);
+        if (! empty($allowedOptions)) {
+            foreach ($allowedOptions as $option) {
+                if ($word === $option) {
+                    return $option;
+                }
+            }
+
+            throw new RuntimeException(
+                'OpenAI response must match one of the allowed decision options: ' . implode(', ', $allowedOptions) . '. Received: ' . $word
+            );
+        }
+
         if ($word !== 'yes' && $word !== 'no') {
             throw new RuntimeException('OpenAI response must be strictly "yes" or "no". Received: ' . $word);
         }
 
         return $word;
+    }
+
+    /**
+     * @param array<string, string> $metadata
+     * @return array<int, string>
+     */
+    private function extractAllowedOptions(array $metadata): array
+    {
+        $raw = $metadata['decision_options_raw'] ?? '';
+        if ($raw === '') {
+            $fallback = $metadata['decision_options'] ?? '';
+            if ($fallback === '') {
+                return [];
+            }
+            $raw = str_replace(',', '|', strtolower($fallback));
+        }
+
+        $parts = array_filter(array_map('trim', explode('|', strtolower($raw))));
+
+        return array_values(array_unique($parts));
     }
 }

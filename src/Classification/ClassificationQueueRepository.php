@@ -25,12 +25,22 @@ final class ClassificationQueueRepository
         $this->resultsTable = $this->wpdb->prefix . 'axs4all_ai_classifications';
     }
 
-    public function enqueue(int $queueId, ?int $extractionId, string $category, string $promptVersion, string $content): ?int
+    public function enqueue(
+        int $queueId,
+        ?int $extractionId,
+        string $category,
+        string $promptVersion,
+        string $content,
+        ?int $clientId = null,
+        ?int $categoryId = null
+    ): ?int
     {
         $now = current_time('mysql');
         $data = [
             'queue_id' => $queueId,
             'extraction_id' => $extractionId !== null ? $extractionId : null,
+            'client_id' => $clientId !== null ? max(0, (int) $clientId) : 0,
+            'category_id' => $categoryId !== null ? max(0, (int) $categoryId) : 0,
             'category' => $category,
             'prompt_version' => $promptVersion,
             'status' => self::STATUS_PENDING,
@@ -43,7 +53,7 @@ final class ClassificationQueueRepository
         $result = $this->wpdb->insert(
             $this->queueTable,
             $data,
-            ['%d', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s']
+            ['%d', '%s', '%d', '%d', '%s', '%s', '%s', '%d', '%s', '%s', '%s']
         );
 
         if ($result === false) {
@@ -98,12 +108,19 @@ final class ClassificationQueueRepository
         return $claimed;
     }
 
-    public function markCompleted(array $job, ClassificationResult $result, array $metrics = [], ?string $model = null): void
+    /**
+     * @param array<string, mixed> $extra
+     */
+    public function markCompleted(array $job, ClassificationResult $result, array $metrics = [], ?string $model = null, array $extra = []): void
     {
         $jobId = (int) $job['id'];
         $queueId = isset($job['queue_id']) ? (int) $job['queue_id'] : 0;
         $extractionId = isset($job['extraction_id']) ? (int) $job['extraction_id'] : null;
         $promptVersion = isset($job['prompt_version']) ? (string) $job['prompt_version'] : 'v1';
+        $clientId = isset($extra['client_id']) ? (int) $extra['client_id'] : (isset($job['client_id']) ? (int) $job['client_id'] : 0);
+        $categoryId = isset($extra['category_id']) ? (int) $extra['category_id'] : (isset($job['category_id']) ? (int) $job['category_id'] : 0);
+        $decisionValue = isset($extra['decision_value']) ? (string) $extra['decision_value'] : $result->decision();
+        $decisionScale = isset($extra['decision_scale']) ? (string) $extra['decision_scale'] : '';
 
         $this->wpdb->update(
             $this->queueTable,
@@ -121,7 +138,11 @@ final class ClassificationQueueRepository
         $data = [
             'queue_id' => $queueId,
             'extraction_id' => ($extractionId !== null && $extractionId > 0) ? $extractionId : null,
+            'client_id' => $clientId > 0 ? $clientId : null,
+            'category_id' => $categoryId > 0 ? $categoryId : null,
             'decision' => $result->decision(),
+            'decision_value' => $decisionValue,
+            'decision_scale' => $decisionScale,
             'confidence' => $result->confidence(),
             'prompt_version' => $promptVersion,
             'model' => $model ?? ($metrics['model'] ?? null),
@@ -135,7 +156,7 @@ final class ClassificationQueueRepository
         $this->wpdb->insert(
             $this->resultsTable,
             $data,
-            ['%d', '%d', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s']
+            ['%d', '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s']
         );
     }
 
@@ -258,7 +279,7 @@ final class ClassificationQueueRepository
         $params = [];
 
         $decision = isset($filters['decision']) ? strtolower((string) $filters['decision']) : '';
-        if ($decision !== '' && in_array($decision, ['yes', 'no'], true)) {
+        if ($decision !== '') {
             $clauses[] = 'AND r.decision = %s';
             $params[] = $decision;
         }

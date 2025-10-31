@@ -22,7 +22,7 @@ final class ClassificationCommand
         int $defaultLimit = 5
     ) {
         $this->queueRepository = $queueRepository;
-        $this->runner = $runner ?? new ClassificationRunner($prompts, $client, $categories, $queueRepository);
+        $this->runner = $runner ?? new ClassificationRunner($prompts, $client, $categories, null, $queueRepository);
         $this->defaultLimit = max(1, $defaultLimit);
     }
 

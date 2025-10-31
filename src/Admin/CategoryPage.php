@@ -67,13 +67,15 @@ final class CategoryPage
                             <tr>
                                 <th><?php esc_html_e('Name', 'axs4all-ai'); ?></th>
                                 <th><?php esc_html_e('Options', 'axs4all-ai'); ?></th>
+                                <th><?php esc_html_e('Decision Set', 'axs4all-ai'); ?></th>
+                                <th><?php esc_html_e('Phrases', 'axs4all-ai'); ?></th>
                                 <th><?php esc_html_e('Actions', 'axs4all-ai'); ?></th>
                             </tr>
                         </thead>
                         <tbody>
                         <?php if (empty($categories)) : ?>
                             <tr>
-                                <td colspan="3"><?php esc_html_e('No categories defined yet.', 'axs4all-ai'); ?></td>
+                                <td colspan="5"><?php esc_html_e('No categories defined yet.', 'axs4all-ai'); ?></td>
                             </tr>
                         <?php else : ?>
                             <?php foreach ($categories as $category) : ?>
@@ -86,7 +88,22 @@ final class CategoryPage
                                             <ul style="margin:0; padding-left:1.2rem;">
                                                 <?php foreach ($category['options'] as $option) : ?>
                                                     <li><?php echo esc_html($option); ?></li>
+                                            <?php endforeach; ?>
+                                            </ul>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?php echo esc_html((string) ($category['decision_set'] ?? 'binary')); ?></td>
+                                    <td>
+                                        <?php if (empty($category['phrases'])) : ?>
+                                            <em><?php esc_html_e('None', 'axs4all-ai'); ?></em>
+                                        <?php else : ?>
+                                            <ul style="margin:0; padding-left:1.2rem;">
+                                                <?php foreach (array_slice($category['phrases'], 0, 3) as $phrase) : ?>
+                                                    <li><?php echo esc_html($phrase); ?></li>
                                                 <?php endforeach; ?>
+                                                <?php if (count($category['phrases']) > 3) : ?>
+                                                    <li><em><?php printf(esc_html__('and %d more…', 'axs4all-ai'), count($category['phrases']) - 3); ?></em></li>
+                                                <?php endif; ?>
                                             </ul>
                                         <?php endif; ?>
                                     </td>
@@ -137,6 +154,57 @@ final class CategoryPage
                                     <p class="description"><?php esc_html_e('One option per line. Empty lines are ignored.', 'axs4all-ai'); ?></p>
                                 </td>
                             </tr>
+                            <tr>
+                                <th scope="row">
+                                    <label for="axs4all-ai-category-base-prompt"><?php esc_html_e('Base Prompt', 'axs4all-ai'); ?></label>
+                                </th>
+                                <td>
+                                    <textarea name="category_base_prompt" id="axs4all-ai-category-base-prompt" rows="6" class="large-text code" placeholder="<?php esc_attr_e('Provide detailed accessibility analysis instructions…', 'axs4all-ai'); ?>"><?php echo esc_textarea($editCategory['base_prompt'] ?? ''); ?></textarea>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">
+                                    <label for="axs4all-ai-category-keywords"><?php esc_html_e('Keywords', 'axs4all-ai'); ?></label>
+                                </th>
+                                <td>
+                                    <textarea name="category_keywords" id="axs4all-ai-category-keywords" rows="3" class="large-text code" placeholder="<?php esc_attr_e("wheelchair access\nstep-free entrance", 'axs4all-ai'); ?>"><?php
+                                        echo esc_textarea(isset($editCategory['keywords']) ? implode("\n", $editCategory['keywords']) : '');
+                                    ?></textarea>
+                                    <p class="description"><?php esc_html_e('One keyword or phrase per line.', 'axs4all-ai'); ?></p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">
+                                    <label for="axs4all-ai-category-phrases"><?php esc_html_e('Real-world Phrases', 'axs4all-ai'); ?></label>
+                                </th>
+                                <td>
+                                    <textarea name="category_phrases" id="axs4all-ai-category-phrases" rows="6" class="large-text code" placeholder="<?php esc_attr_e("Entrance has two steps\nElevator requires staff assistance", 'axs4all-ai'); ?>"><?php
+                                        echo esc_textarea(isset($editCategory['phrases']) ? implode("\n", $editCategory['phrases']) : '');
+                                    ?></textarea>
+                                    <p class="description"><?php esc_html_e('Add phrases you want the AI to factor in. One per line.', 'axs4all-ai'); ?></p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">
+                                    <label for="axs4all-ai-category-decision"><?php esc_html_e('Decision Set', 'axs4all-ai'); ?></label>
+                                </th>
+                                <td>
+                                    <select name="category_decision_set" id="axs4all-ai-category-decision">
+                                        <?php
+                                        $selectedDecision = $editCategory['decision_set'] ?? 'binary';
+                                        $decisionSets = [
+                                            'binary' => __('Binary (yes/no)', 'axs4all-ai'),
+                                            'accessibility' => __('Accessibility scale (none/limited/full)', 'axs4all-ai'),
+                                        ];
+                                        foreach ($decisionSets as $value => $label) :
+                                        ?>
+                                            <option value="<?php echo esc_attr($value); ?>" <?php selected($selectedDecision, $value); ?>>
+                                                <?php echo esc_html($label); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </td>
+                            </tr>
                         </table>
                         <?php submit_button($editCategory ? __('Update Category', 'axs4all-ai') : __('Create Category', 'axs4all-ai')); ?>
                         <?php if ($editCategory) : ?>
@@ -159,23 +227,36 @@ final class CategoryPage
         $id = isset($_POST['category_id']) ? (int) $_POST['category_id'] : 0;
         $name = isset($_POST['category_name']) ? (string) wp_unslash($_POST['category_name']) : '';
         $optionsRaw = isset($_POST['category_options']) ? (string) wp_unslash($_POST['category_options']) : '';
-        $options = $this->splitOptions($optionsRaw);
+        $options = $this->splitLines($optionsRaw);
+        $basePrompt = isset($_POST['category_base_prompt']) ? (string) wp_unslash($_POST['category_base_prompt']) : '';
+        $keywordsRaw = isset($_POST['category_keywords']) ? (string) wp_unslash($_POST['category_keywords']) : '';
+        $phrasesRaw = isset($_POST['category_phrases']) ? (string) wp_unslash($_POST['category_phrases']) : '';
+        $decisionSet = isset($_POST['category_decision_set']) ? (string) wp_unslash($_POST['category_decision_set']) : 'binary';
 
         if ($name === '') {
             $this->redirectWithMessage('category_error', __('Category name is required.', 'axs4all-ai'));
         }
 
         $options = $this->repository->sanitizeOptions($options);
+        $keywords = $this->repository->sanitizeOptions($this->splitLines($keywordsRaw));
+        $phrases = $this->repository->sanitizeOptions($this->splitLines($phrasesRaw));
+
+        $meta = [
+            'base_prompt' => $basePrompt,
+            'keywords' => $keywords,
+            'phrases' => $phrases,
+            'decision_set' => $decisionSet,
+        ];
 
         if ($id > 0) {
-            $success = $this->repository->update($id, $name, $options);
+            $success = $this->repository->update($id, $name, $options, $meta);
             $this->redirectWithMessage(
                 $success ? 'category_message' : 'category_error',
                 $success ? __('Category updated.', 'axs4all-ai') : __('Failed to update category.', 'axs4all-ai'),
                 $success ? ['edit_category' => null] : ['edit_category' => $id]
             );
         } else {
-            $newId = $this->repository->create($name, $options);
+            $newId = $this->repository->create($name, $options, $meta);
             $this->redirectWithMessage(
                 $newId ? 'category_message' : 'category_error',
                 $newId ? __('Category created.', 'axs4all-ai') : __('Failed to create category.', 'axs4all-ai')
@@ -206,7 +287,7 @@ final class CategoryPage
     /**
      * @return array<int, string>
      */
-    private function splitOptions(string $raw): array
+    private function splitLines(string $raw): array
     {
         $lines = preg_split("/\r\n|\r|\n/", $raw) ?: [];
         return array_map('trim', $lines);

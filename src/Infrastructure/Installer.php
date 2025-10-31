@@ -8,7 +8,7 @@ use wpdb;
 
 final class Installer
 {
-    private const DB_VERSION = '1.1.0';
+    private const DB_VERSION = '1.2.0';
     private const OPTION_KEY = 'axs4all_ai_db_version';
 
     public static function activate(): void
@@ -36,6 +36,9 @@ final class Installer
         $queueTable = $wpdb->prefix . 'axs4all_ai_queue';
         $snapshotsTable = $wpdb->prefix . 'axs4all_ai_snapshots';
         $extractionsTable = $wpdb->prefix . 'axs4all_ai_extractions';
+        $clientsTable = $wpdb->prefix . 'axs4all_ai_clients';
+        $clientUrlsTable = $wpdb->prefix . 'axs4all_ai_client_urls';
+        $clientCategoriesTable = $wpdb->prefix . 'axs4all_ai_client_categories';
         $promptsTable = $wpdb->prefix . 'axs4all_ai_prompts';
         $classificationQueueTable = $wpdb->prefix . 'axs4all_ai_classifications_queue';
         $classificationsTable = $wpdb->prefix . 'axs4all_ai_classifications';
@@ -78,6 +81,38 @@ final class Installer
             KEY queue_id (queue_id)
         ) {$charsetCollate};";
 
+        $clientsSql = "CREATE TABLE {$clientsTable} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            name VARCHAR(190) NOT NULL,
+            status VARCHAR(32) NOT NULL DEFAULT 'active',
+            notes LONGTEXT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            PRIMARY KEY (id),
+            KEY status (status),
+            KEY name (name)
+        ) {$charsetCollate};";
+
+        $clientUrlsSql = "CREATE TABLE {$clientUrlsTable} (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+            client_id BIGINT UNSIGNED NOT NULL,
+            url TEXT NOT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            PRIMARY KEY (id),
+            KEY client_id (client_id)
+        ) {$charsetCollate};";
+
+        $clientCategoriesSql = "CREATE TABLE {$clientCategoriesTable} (
+            client_id BIGINT UNSIGNED NOT NULL,
+            category_id BIGINT UNSIGNED NOT NULL,
+            overrides LONGTEXT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            PRIMARY KEY (client_id, category_id),
+            KEY category_id (category_id)
+        ) {$charsetCollate};";
+
         $promptsSql = "CREATE TABLE {$promptsTable} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             category VARCHAR(64) NOT NULL DEFAULT '',
@@ -95,6 +130,8 @@ final class Installer
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             queue_id BIGINT UNSIGNED NOT NULL,
             extraction_id BIGINT UNSIGNED DEFAULT NULL,
+            client_id BIGINT UNSIGNED DEFAULT NULL,
+            category_id BIGINT UNSIGNED DEFAULT NULL,
             category VARCHAR(64) NOT NULL DEFAULT '',
             prompt_version VARCHAR(32) NOT NULL DEFAULT 'v1',
             status VARCHAR(32) NOT NULL DEFAULT 'pending',
@@ -107,14 +144,20 @@ final class Installer
             PRIMARY KEY  (id),
             KEY status (status),
             KEY queue_id (queue_id),
-            KEY extraction_id (extraction_id)
+            KEY extraction_id (extraction_id),
+            KEY client_id (client_id),
+            KEY category_id (category_id)
         ) {$charsetCollate};";
 
         $classificationsSql = "CREATE TABLE {$classificationsTable} (
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             queue_id BIGINT UNSIGNED NOT NULL,
             extraction_id BIGINT UNSIGNED DEFAULT NULL,
-            decision VARCHAR(8) NOT NULL,
+            client_id BIGINT UNSIGNED DEFAULT NULL,
+            category_id BIGINT UNSIGNED DEFAULT NULL,
+            decision VARCHAR(32) NOT NULL,
+            decision_value VARCHAR(64) DEFAULT NULL,
+            decision_scale VARCHAR(64) DEFAULT NULL,
             confidence DECIMAL(5,4) DEFAULT NULL,
             prompt_version VARCHAR(32) NOT NULL DEFAULT 'v1',
             model VARCHAR(64) DEFAULT NULL,
@@ -126,10 +169,12 @@ final class Installer
             PRIMARY KEY  (id),
             KEY queue_id (queue_id),
             KEY extraction_id (extraction_id),
+            KEY client_id (client_id),
+            KEY category_id (category_id),
             KEY decision (decision)
         ) {$charsetCollate};";
 
-        dbDelta([$queueSql, $snapshotsSql, $extractionsSql, $promptsSql, $classificationQueueSql, $classificationsSql]);
+        dbDelta([$queueSql, $snapshotsSql, $extractionsSql, $clientsSql, $clientUrlsSql, $clientCategoriesSql, $promptsSql, $classificationQueueSql, $classificationsSql]);
 
         update_option(self::OPTION_KEY, self::DB_VERSION);
     }

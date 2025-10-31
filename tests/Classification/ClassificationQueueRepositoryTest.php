@@ -24,6 +24,8 @@ final class ClassificationQueueRepositoryTest extends TestCase
                     self::assertSame('default', $data['category']);
                     self::assertSame('pending', $data['status']);
                     self::assertSame('sample', $data['content']);
+                    self::assertSame(3, $data['client_id']);
+                    self::assertSame(7, $data['category_id']);
                     return true;
                 })
             )
@@ -33,7 +35,7 @@ final class ClassificationQueueRepositoryTest extends TestCase
             });
 
         $repository = new ClassificationQueueRepository($wpdb);
-        $id = $repository->enqueue(10, null, 'default', 'v1', 'sample');
+        $id = $repository->enqueue(10, null, 'default', 'v1', 'sample', 3, 7);
 
         self::assertSame(99, $id);
     }
@@ -67,6 +69,10 @@ final class ClassificationQueueRepositoryTest extends TestCase
                     self::assertSame('yes', $data['decision']);
                     self::assertSame(42, $data['tokens_prompt']);
                     self::assertSame(8, $data['tokens_completion']);
+                    self::assertSame('yes', $data['decision_value']);
+                    self::assertSame('binary', $data['decision_scale']);
+                    self::assertSame(21, $data['client_id']);
+                    self::assertSame(4, $data['category_id']);
                     return true;
                 })
             )
@@ -89,7 +95,13 @@ final class ClassificationQueueRepositoryTest extends TestCase
             ],
             $result,
             $result->metrics(),
-            'gpt'
+            'gpt',
+            [
+                'client_id' => 21,
+                'category_id' => 4,
+                'decision_value' => 'yes',
+                'decision_scale' => 'binary',
+            ]
         );
     }
 

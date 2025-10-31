@@ -44,7 +44,7 @@ final class ClassificationSchedulerTest extends TestCase
             new ClassificationResult('yes', '{"decision":"yes"}')
         );
 
-        $runner = new ClassificationRunner($promptRepo, $aiClient, null, $queueRepo);
+        $runner = new ClassificationRunner($promptRepo, $aiClient, null, null, $queueRepo);
         $scheduler = new ClassificationScheduler($queueRepo, $runner, 3);
         $scheduler->processCli([], ['batch' => 3]);
 
@@ -83,7 +83,7 @@ final class ClassificationSchedulerTest extends TestCase
             new ClassificationResult('no', '{"decision":"no"}')
         );
 
-        $runner = new ClassificationRunner($promptRepo, $aiClient, null, $queueRepo);
+        $runner = new ClassificationRunner($promptRepo, $aiClient, null, null, $queueRepo);
         $scheduler = new ClassificationScheduler($queueRepo, $runner, 2);
         $scheduler->processCli([], ['batch' => 2, 'drain' => true]);
 

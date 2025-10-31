@@ -54,6 +54,13 @@ if (! function_exists('wp_strip_all_tags')) {
     }
 }
 
+if (! function_exists('esc_url_raw')) {
+    function esc_url_raw(string $url): string
+    {
+        return trim($url);
+    }
+}
+
 if (! class_exists('wpdb')) {
     class wpdb
     {

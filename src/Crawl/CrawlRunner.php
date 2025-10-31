@@ -6,6 +6,8 @@ namespace Axs4allAi\Crawl;
 
 use Axs4allAi\Classification\ClassificationQueueRepository;
 use Axs4allAi\Classification\PromptRepository;
+use Axs4allAi\Category\CategoryRepository;
+use Axs4allAi\Data\ClientRepository;
 use Axs4allAi\Data\QueueRepository;
 use Axs4allAi\Extraction\Extractor;
 
@@ -14,19 +16,29 @@ final class CrawlRunner
     private QueueRepository $repository;
     private ?PromptRepository $promptRepository;
     private ?ClassificationQueueRepository $classificationQueue;
+    private ?ClientRepository $clients;
+    private ?CategoryRepository $categories;
     private Scraper $scraper;
     private Extractor $extractor;
+    /** @var array<int, array<string, mixed>> */
+    private array $categoryCacheById = [];
+    /** @var array<string, array<string, mixed>> */
+    private array $categoryCacheByName = [];
 
     public function __construct(
         QueueRepository $repository,
         ?PromptRepository $promptRepository = null,
         ?ClassificationQueueRepository $classificationQueue = null,
+        ?ClientRepository $clients = null,
+        ?CategoryRepository $categories = null,
         ?Scraper $scraper = null,
         ?Extractor $extractor = null
     ) {
         $this->repository = $repository;
         $this->promptRepository = $promptRepository;
         $this->classificationQueue = $classificationQueue;
+        $this->clients = $clients;
+        $this->categories = $categories;
         $this->scraper = $scraper ?? new Scraper();
         $this->extractor = $extractor ?? new Extractor();
     }
@@ -47,6 +59,9 @@ final class CrawlRunner
 
             error_log(sprintf('[axs4all-ai] Processing queue item #%d (%s).', $queueId, $url));
 
+            $client = $this->clients instanceof ClientRepository ? $this->clients->findByUrl($url) : null;
+            $clientId = isset($client['id']) ? (int) $client['id'] : null;
+
             $html = $this->scraper->fetch($url);
             if ($html === null) {
                 error_log(sprintf('[axs4all-ai] Scraper stub returned no HTML for %s.', $url));
@@ -63,10 +78,10 @@ final class CrawlRunner
             );
 
             if ($this->classificationQueue !== null && ! empty($snippets)) {
-                $promptVersion = 'v1';
-                if ($this->promptRepository !== null) {
-                    $template = $this->promptRepository->getActiveTemplate($category);
-                    $promptVersion = $template->version();
+                $assignments = $this->determineCategoryAssignments($category, $client);
+                if (empty($assignments)) {
+                    error_log(sprintf('[axs4all-ai] No categories resolved for queue item #%d. Skipping classification.', $queueId));
+                    continue;
                 }
 
                 foreach ($snippets as $index => $snippet) {
@@ -75,36 +90,152 @@ final class CrawlRunner
                         continue;
                     }
 
-                    $jobId = $this->classificationQueue->enqueue(
-                        $queueId,
-                        null,
-                        $category,
-                        $promptVersion,
-                        $snippet
-                    );
+                    foreach ($assignments as $assignment) {
+                        $categoryName = (string) $assignment['name'];
+                        $categoryId = isset($assignment['id']) ? (int) $assignment['id'] : null;
 
-                    if ($jobId !== null) {
-                        error_log(
-                            sprintf(
-                                '[axs4all-ai] Enqueued classification job #%d for queue item #%d (snippet %d).',
-                                $jobId,
-                                $queueId,
-                                $index + 1
-                            )
+                        $promptVersion = 'v1';
+                        if ($this->promptRepository !== null) {
+                            $template = $this->promptRepository->getActiveTemplate($categoryName);
+                            $promptVersion = $template->version();
+                        }
+
+                        $jobId = $this->classificationQueue->enqueue(
+                            $queueId,
+                            null,
+                            $categoryName,
+                            $promptVersion,
+                            $snippet,
+                            $clientId,
+                            $categoryId
                         );
-                    } else {
-                        error_log(
-                            sprintf(
-                                '[axs4all-ai] Failed to enqueue classification job for queue item #%d (snippet %d).',
-                                $queueId,
-                                $index + 1
-                            )
-                        );
+
+                        if ($jobId !== null) {
+                            error_log(
+                                sprintf(
+                                    '[axs4all-ai] Enqueued classification job #%d for queue item #%d (snippet %d, category: %s).',
+                                    $jobId,
+                                    $queueId,
+                                    $index + 1,
+                                    $categoryName
+                                )
+                            );
+                        } else {
+                            error_log(
+                                sprintf(
+                                    '[axs4all-ai] Failed to enqueue classification job for queue item #%d (snippet %d, category: %s).',
+                                    $queueId,
+                                    $index + 1,
+                                    $categoryName
+                                )
+                            );
+                        }
                     }
                 }
             }
         }
 
         error_log('[axs4all-ai] Crawl runner stub finished.');
+    }
+
+    /**
+     * @param array<string, mixed>|null $client
+     * @return array<int, array<string, mixed>>
+     */
+    private function determineCategoryAssignments(string $fallbackCategory, ?array $client): array
+    {
+        $assignments = [];
+
+        if ($client !== null && $this->clients instanceof ClientRepository) {
+            $clientId = isset($client['id']) ? (int) $client['id'] : 0;
+            if ($clientId > 0) {
+                foreach ($this->clients->getCategoryAssignments($clientId) as $row) {
+                    $category = $this->resolveCategoryById($row['category_id']);
+                    if ($category === null) {
+                        continue;
+                    }
+
+                    $assignments[] = [
+                        'id' => (int) $category['id'],
+                        'name' => (string) $category['name'],
+                    ];
+                }
+            }
+        }
+
+        if (! empty($assignments)) {
+            return $assignments;
+        }
+
+        $category = $this->resolveCategoryByName($fallbackCategory);
+        if ($category !== null) {
+            $assignments[] = [
+                'id' => (int) $category['id'],
+                'name' => (string) $category['name'],
+            ];
+        } else {
+            $assignments[] = [
+                'id' => null,
+                'name' => $fallbackCategory,
+            ];
+        }
+
+        return $assignments;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function resolveCategoryById(int $id): ?array
+    {
+        if ($id <= 0 || ! $this->categories instanceof CategoryRepository) {
+            return null;
+        }
+
+        if (! isset($this->categoryCacheById[$id])) {
+            $category = $this->categories->find($id);
+            if ($category !== null) {
+                $this->categoryCacheById[$id] = $category;
+                $key = strtolower((string) $category['name']);
+                $this->categoryCacheByName[$key] = $category;
+            } else {
+                $this->categoryCacheById[$id] = null;
+            }
+        }
+
+        return $this->categoryCacheById[$id] ?? null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function resolveCategoryByName(string $name): ?array
+    {
+        $nameKey = strtolower(trim($name));
+        if ($nameKey === '' || ! $this->categories instanceof CategoryRepository) {
+            return null;
+        }
+
+        if (isset($this->categoryCacheByName[$nameKey])) {
+            return $this->categoryCacheByName[$nameKey];
+        }
+
+        $this->populateCategoryCache();
+
+        return $this->categoryCacheByName[$nameKey] ?? null;
+    }
+
+    private function populateCategoryCache(): void
+    {
+        if (! empty($this->categoryCacheById) || ! $this->categories instanceof CategoryRepository) {
+            return;
+        }
+
+        foreach ($this->categories->all() as $category) {
+            $id = (int) $category['id'];
+            $nameKey = strtolower((string) $category['name']);
+            $this->categoryCacheById[$id] = $category;
+            $this->categoryCacheByName[$nameKey] = $category;
+        }
     }
 }

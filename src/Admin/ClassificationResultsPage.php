@@ -38,7 +38,7 @@ final class ClassificationResultsPage
         $request = wp_unslash($_GET);
 
         $decision = isset($request['decision']) ? sanitize_text_field((string) $request['decision']) : '';
-        $decision = in_array($decision, ['yes', 'no'], true) ? $decision : '';
+        $decision = $decision !== '' ? strtolower($decision) : '';
         $model = isset($request['model']) ? sanitize_text_field((string) $request['model']) : '';
         $promptVersion = isset($request['prompt_version']) ? sanitize_text_field((string) $request['prompt_version']) : '';
         $createdStart = isset($request['created_start']) ? sanitize_text_field((string) $request['created_start']) : '';
@@ -104,11 +104,7 @@ final class ClassificationResultsPage
                 <div class="tablenav top">
                     <div class="alignleft actions">
                         <label for="axs4all-ai-decision" class="screen-reader-text"><?php esc_html_e('Decision filter', 'axs4all-ai'); ?></label>
-                        <select name="decision" id="axs4all-ai-decision">
-                            <option value=""><?php esc_html_e('All decisions', 'axs4all-ai'); ?></option>
-                            <option value="yes" <?php selected($decision, 'yes'); ?>><?php esc_html_e('Yes', 'axs4all-ai'); ?></option>
-                            <option value="no" <?php selected($decision, 'no'); ?>><?php esc_html_e('No', 'axs4all-ai'); ?></option>
-                        </select>
+                        <input type="text" name="decision" id="axs4all-ai-decision" value="<?php echo esc_attr($decision); ?>" placeholder="<?php esc_attr_e('Decision', 'axs4all-ai'); ?>">
 
                         <label for="axs4all-ai-model" class="screen-reader-text"><?php esc_html_e('Model filter', 'axs4all-ai'); ?></label>
                         <input type="text" name="model" id="axs4all-ai-model" value="<?php echo esc_attr($model); ?>" placeholder="<?php esc_attr_e('Model', 'axs4all-ai'); ?>">
@@ -121,64 +117,43 @@ final class ClassificationResultsPage
                         <input type="date" name="created_start" value="<?php echo esc_attr($createdStart); ?>">
                         <input type="date" name="created_end" value="<?php echo esc_attr($createdEnd); ?>">
 
-                        <input type="search" name="search" value="<?php echo esc_attr($search); ?>" placeholder="<?php esc_attr_e('Search raw response or URL', 'axs4all-ai'); ?>" style="width: 220px;">
+                        <input type="search" name="search" value="<?php echo esc_attr($search); ?>" placeholder="<?php esc_attr_e('Search text or queue id', 'axs4all-ai'); ?>">
 
-                        <label for="axs4all-ai-per-page" class="screen-reader-text"><?php esc_html_e('Rows per page', 'axs4all-ai'); ?></label>
-                        <select name="per_page" id="axs4all-ai-per-page">
-                            <?php foreach ([10, 20, 50, 100] as $option) : ?>
-                                <option value="<?php echo esc_attr((string) $option); ?>" <?php selected($perPage, $option); ?>><?php echo esc_html(sprintf(_n('%d result', '%d results', $option, 'axs4all-ai'), $option)); ?></option>
-                            <?php endforeach; ?>
-                        </select>
+                        <label for="axs4all-ai-per-page" class="screen-reader-text"><?php esc_html_e('Per-page count', 'axs4all-ai'); ?></label>
+                        <input type="number" name="per_page" id="axs4all-ai-per-page" min="5" max="100" value="<?php echo esc_attr((string) $perPage); ?>">
 
                         <input type="submit" class="button" value="<?php esc_attr_e('Filter', 'axs4all-ai'); ?>">
-                        <a class="button button-secondary" href="<?php echo esc_url(admin_url('admin.php?page=' . self::MENU_SLUG)); ?>">
-                            <?php esc_html_e('Reset', 'axs4all-ai'); ?>
-                        </a>
                     </div>
                 </div>
             </form>
 
-            <?php if ($detailId > 0) : ?>
-                <div class="notice notice-info">
-                    <?php if ($detail !== null) : ?>
-                        <h2><?php printf(esc_html__('Classification #%d details', 'axs4all-ai'), (int) $detail['id']); ?></h2>
-                        <ul>
-                            <li><strong><?php esc_html_e('Decision:', 'axs4all-ai'); ?></strong> <?php echo esc_html(strtoupper((string) $detail['decision'])); ?></li>
-                            <li><strong><?php esc_html_e('Confidence:', 'axs4all-ai'); ?></strong>
-                                <?php
-                                if ($detail['confidence'] !== null) {
-                                    echo esc_html(number_format((float) $detail['confidence'] * 100, 1)) . '%';
-                                } else {
-                                    esc_html_e('n/a', 'axs4all-ai');
-                                }
-                                ?>
-                            </li>
-                            <li><strong><?php esc_html_e('Model:', 'axs4all-ai'); ?></strong> <?php echo esc_html((string) ($detail['model'] ?? 'n/a')); ?></li>
-                            <li><strong><?php esc_html_e('Prompt version:', 'axs4all-ai'); ?></strong> <?php echo esc_html((string) $detail['prompt_version']); ?></li>
-                            <li><strong><?php esc_html_e('Queue ID:', 'axs4all-ai'); ?></strong> <?php echo esc_html((string) $detail['queue_id']); ?></li>
-                            <li><strong><?php esc_html_e('Category:', 'axs4all-ai'); ?></strong> <?php echo esc_html((string) ($detail['category'] ?? 'n/a')); ?></li>
-                            <li><strong><?php esc_html_e('Source URL:', 'axs4all-ai'); ?></strong>
-                                <?php if (! empty($detail['source_url'])) : ?>
-                                    <a href="<?php echo esc_url((string) $detail['source_url']); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html((string) $detail['source_url']); ?></a>
-                                <?php else : ?>
-                                    <?php esc_html_e('n/a', 'axs4all-ai'); ?>
-                                <?php endif; ?>
-                            </li>
-                            <li><strong><?php esc_html_e('Created:', 'axs4all-ai'); ?></strong> <?php echo esc_html((string) $detail['created_at']); ?></li>
-                            <li><strong><?php esc_html_e('Tokens (prompt/completion):', 'axs4all-ai'); ?></strong>
-                                <?php echo esc_html(sprintf('%s / %s', $detail['tokens_prompt'] ?? '—', $detail['tokens_completion'] ?? '—')); ?>
-                            </li>
-                            <li><strong><?php esc_html_e('Duration (ms):', 'axs4all-ai'); ?></strong> <?php echo esc_html((string) ($detail['duration_ms'] ?? '—')); ?></li>
-                        </ul>
-                        <?php if (! empty($detail['content'])) : ?>
-                            <p><strong><?php esc_html_e('Snippet content:', 'axs4all-ai'); ?></strong></p>
-                            <pre style="white-space: pre-wrap;"><?php echo esc_html((string) $detail['content']); ?></pre>
-                        <?php endif; ?>
-                        <p><strong><?php esc_html_e('Raw response:', 'axs4all-ai'); ?></strong></p>
-                        <pre style="max-height: 320px; overflow:auto;"><?php echo esc_html((string) $detail['raw_response']); ?></pre>
-                    <?php else : ?>
-                        <p><?php esc_html_e('The requested classification could not be found.', 'axs4all-ai'); ?></p>
+            <?php if ($detail !== null) : ?>
+                <div class="axs4all-ai-classification-detail" style="margin-bottom:2rem; padding:1rem; border:1px solid #ccd0d4; background:#fff;">
+                    <h2><?php esc_html_e('Classification Detail', 'axs4all-ai'); ?></h2>
+                    <ul>
+                        <li><strong><?php esc_html_e('Decision:', 'axs4all-ai'); ?></strong> <?php echo esc_html((string) ($detail['decision_value'] ?? $detail['decision'])); ?><?php if (! empty($detail['decision_scale'])) : ?> <em>(<?php echo esc_html((string) $detail['decision_scale']); ?>)</em><?php endif; ?></li>
+                        <li><strong><?php esc_html_e('Confidence:', 'axs4all-ai'); ?></strong> <?php echo $detail['confidence'] !== null ? esc_html(number_format((float) $detail['confidence'] * 100, 1)) . '%' : '&mdash;'; ?></li>
+                        <li><strong><?php esc_html_e('Model:', 'axs4all-ai'); ?></strong> <?php echo esc_html((string) ($detail['model'] ?? '--')); ?></li>
+                        <li><strong><?php esc_html_e('Prompt version:', 'axs4all-ai'); ?></strong> <?php echo esc_html((string) $detail['prompt_version']); ?></li>
+                        <li><strong><?php esc_html_e('Queue ID:', 'axs4all-ai'); ?></strong> <?php echo esc_html((string) $detail['queue_id']); ?></li>
+                        <li><strong><?php esc_html_e('Category:', 'axs4all-ai'); ?></strong> <?php echo esc_html((string) ($detail['category'] ?? '--')); ?></li>
+                        <li><strong><?php esc_html_e('Source URL:', 'axs4all-ai'); ?></strong>
+                            <?php if (! empty($detail['source_url'])) : ?>
+                                <a href="<?php echo esc_url((string) $detail['source_url']); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html((string) $detail['source_url']); ?></a>
+                            <?php else : ?>
+                                <?php esc_html_e('n/a', 'axs4all-ai'); ?>
+                            <?php endif; ?>
+                        </li>
+                        <li><strong><?php esc_html_e('Created:', 'axs4all-ai'); ?></strong> <?php echo esc_html((string) $detail['created_at']); ?></li>
+                        <li><strong><?php esc_html_e('Tokens (prompt/completion):', 'axs4all-ai'); ?></strong> <?php echo esc_html(sprintf('%s / %s', $detail['tokens_prompt'] ?? '--', $detail['tokens_completion'] ?? '--')); ?></li>
+                        <li><strong><?php esc_html_e('Duration (ms):', 'axs4all-ai'); ?></strong> <?php echo esc_html((string) ($detail['duration_ms'] ?? '--')); ?></li>
+                    </ul>
+                    <?php if (! empty($detail['content'])) : ?>
+                        <p><strong><?php esc_html_e('Snippet content:', 'axs4all-ai'); ?></strong></p>
+                        <pre style="white-space: pre-wrap;"><?php echo esc_html((string) $detail['content']); ?></pre>
                     <?php endif; ?>
+                    <p><strong><?php esc_html_e('Raw response:', 'axs4all-ai'); ?></strong></p>
+                    <pre style="max-height: 320px; overflow:auto;"><?php echo esc_html((string) $detail['raw_response']); ?></pre>
                 </div>
             <?php endif; ?>
 
@@ -201,34 +176,46 @@ final class ClassificationResultsPage
                 <tbody>
                 <?php if (empty($results)) : ?>
                     <tr>
-                        <td colspan="10"><?php esc_html_e('No classifications match the current filters.', 'axs4all-ai'); ?></td>
+                        <td colspan="11"><?php esc_html_e('No classifications match the current filters.', 'axs4all-ai'); ?></td>
                     </tr>
                 <?php else : ?>
                     <?php foreach ($results as $result) : ?>
                         <tr>
-                            <td><?php echo esc_html(strtoupper((string) $result['decision'])); ?></td>
+                            <td>
+                                <?php
+                                $decisionValue = isset($result['decision_value']) && $result['decision_value'] !== ''
+                                    ? $result['decision_value']
+                                    : ($result['decision'] ?? '');
+                                ?>
+                                <strong><?php echo esc_html(ucwords((string) $decisionValue)); ?></strong>
+                                <?php if (! empty($result['decision_scale'])) : ?>
+                                    <br><small><?php echo esc_html((string) $result['decision_scale']); ?></small>
+                                <?php endif; ?>
+                            </td>
                             <td><?php echo esc_html((string) $result['queue_id']); ?></td>
                             <td>
                                 <?php if (! empty($result['source_url'])) : ?>
-                                    <a href="<?php echo esc_url((string) $result['source_url']); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(wp_trim_words((string) $result['source_url'], 6, '…')); ?></a>
+                                    <a href="<?php echo esc_url((string) $result['source_url']); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(wp_trim_words((string) $result['source_url'], 6, '...')); ?></a>
                                 <?php else : ?>
                                     &mdash;
                                 <?php endif; ?>
                             </td>
-                            <td><?php echo esc_html((string) ($result['category'] ?? '—')); ?></td>
+                            <td><?php echo ! empty($result['category']) ? esc_html((string) $result['category']) : '&mdash;'; ?></td>
+                            <td><?php echo $result['confidence'] !== null ? esc_html(number_format((float) $result['confidence'] * 100, 1)) . '%' : '&mdash;'; ?></td>
+                            <td><?php echo esc_html((string) $result['prompt_version']); ?></td>
+                            <td><?php echo ! empty($result['model']) ? esc_html((string) $result['model']) : '&mdash;'; ?></td>
                             <td>
                                 <?php
-                                if ($result['confidence'] !== null) {
-                                    echo esc_html(number_format((float) $result['confidence'] * 100, 1)) . '%';
-                                } else {
+                                $tokensPrompt = isset($result['tokens_prompt']) ? (string) $result['tokens_prompt'] : '';
+                                $tokensCompletion = isset($result['tokens_completion']) ? (string) $result['tokens_completion'] : '';
+                                if ($tokensPrompt === '' && $tokensCompletion === '') {
                                     echo '&mdash;';
+                                } else {
+                                    echo esc_html(sprintf('%s / %s', $tokensPrompt !== '' ? $tokensPrompt : '0', $tokensCompletion !== '' ? $tokensCompletion : '0'));
                                 }
                                 ?>
                             </td>
-                            <td><?php echo esc_html((string) $result['prompt_version']); ?></td>
-                            <td><?php echo esc_html((string) ($result['model'] ?? '—')); ?></td>
-                            <td><?php echo esc_html(sprintf('%s / %s', $result['tokens_prompt'] ?? '—', $result['tokens_completion'] ?? '—')); ?></td>
-                            <td><?php echo esc_html((string) ($result['duration_ms'] ?? '—')); ?></td>
+                            <td><?php echo isset($result['duration_ms']) ? esc_html((string) $result['duration_ms']) : '&mdash;'; ?></td>
                             <td><?php echo esc_html((string) $result['created_at']); ?></td>
                             <td>
                                 <?php

@@ -18,13 +18,20 @@ final class PromptRepository
         'default' => [
             'template' => <<<EOT
 You are an accessibility compliance assistant.
-Review the following context extracted from a hospitality website and answer strictly "yes" or "no" to the question:
-"Does this content confirm that the venue is accessible for wheelchair users?"
+
+Category focus:
+{{category_prompt}}
+
+Decision options: {{decision_options}}
+Additional keywords to consider: {{category_keywords}}
+
+Helpful phrases to watch for:
+{{category_phrases}}
 
 Context:
 {{context}}
 
-Answer (only "yes" or "no"):
+Respond with exactly one lowercase value from the decision options.
 EOT,
             'version' => 'v1',
         ],
