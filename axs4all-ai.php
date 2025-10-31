@@ -11,6 +11,7 @@
 
 declare(strict_types=1);
 
+use Axs4allAi\Classification\ClassificationScheduler;
 use Axs4allAi\Crawl\CrawlScheduler;
 use Axs4allAi\Infrastructure\Installer;
 
@@ -55,7 +56,13 @@ if (file_exists($env) && class_exists(\Dotenv\Dotenv::class)) {
 }
 
 register_activation_hook(AXS4ALL_AI_PLUGIN_FILE, [Installer::class, 'activate']);
-register_deactivation_hook(AXS4ALL_AI_PLUGIN_FILE, [CrawlScheduler::class, 'deactivate']);
+register_deactivation_hook(
+    AXS4ALL_AI_PLUGIN_FILE,
+    static function (): void {
+        CrawlScheduler::deactivate();
+        ClassificationScheduler::deactivate();
+    }
+);
 
 if (! class_exists(\Axs4allAi\Plugin::class)) {
     return;

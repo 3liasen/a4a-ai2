@@ -1,0 +1,6 @@
+{
+  "phpunit.args": [
+    "--bootstrap",
+    "${workspaceFolder}\\tests\\bootstrap.php"
+  ]
+}

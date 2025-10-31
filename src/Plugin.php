@@ -12,6 +12,8 @@ use Axs4allAi\Admin\SettingsPage;
 use Axs4allAi\Ai\OpenAiClient;
 use Axs4allAi\Classification\ClassificationCommand;
 use Axs4allAi\Classification\ClassificationQueueRepository;
+use Axs4allAi\Classification\ClassificationRunner;
+use Axs4allAi\Classification\ClassificationScheduler;
 use Axs4allAi\Classification\PromptRepository;
 use Axs4allAi\Category\CategoryRegistrar;
 use Axs4allAi\Category\CategoryRepository;
@@ -28,6 +30,9 @@ final class Plugin
     private CategoryRegistrar $categoryRegistrar;
     private CategoryRepository $categoryRepository;
     private ClassificationQueueRepository $classificationQueueRepository;
+    private OpenAiClient $aiClient;
+    private ClassificationRunner $classificationRunner;
+    private ClassificationScheduler $classificationScheduler;
     private CrawlRunner $crawlRunner;
     public function __construct()
     {
@@ -38,6 +43,17 @@ final class Plugin
         $this->categoryRegistrar = new CategoryRegistrar();
         $this->categoryRepository = new CategoryRepository();
         $this->classificationQueueRepository = new ClassificationQueueRepository($wpdb);
+        $this->aiClient = new OpenAiClient($this->resolveApiKey());
+        $this->classificationRunner = new ClassificationRunner(
+            $this->promptRepository,
+            $this->aiClient,
+            $this->categoryRepository,
+            $this->classificationQueueRepository
+        );
+        $this->classificationScheduler = new ClassificationScheduler(
+            $this->classificationQueueRepository,
+            $this->classificationRunner
+        );
         $this->crawlRunner = new CrawlRunner(
             $this->queueRepository,
             $this->promptRepository,
@@ -60,6 +76,7 @@ final class Plugin
         $this->categoryRegistrar->register();
         $this->registerAdminHooks();
         $this->crawlScheduler->register();
+        $this->classificationScheduler->register();
         $this->registerCliCommands();
     }
 
@@ -85,13 +102,12 @@ final class Plugin
 
     private function registerCliCommands(): void
     {
-        $apiKey = $this->resolveApiKey();
-        $client = new OpenAiClient($apiKey);
         $command = new ClassificationCommand(
             $this->promptRepository,
-            $client,
+            $this->aiClient,
             $this->categoryRepository,
-            $this->classificationQueueRepository
+            $this->classificationQueueRepository,
+            $this->classificationRunner
         );
         $command->register();
     }

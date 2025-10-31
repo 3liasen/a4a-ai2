@@ -182,6 +182,13 @@ if (! function_exists('get_posts')) {
     }
 }
 
+if (! function_exists('__')) {
+    function __(string $text, string $domain = 'default'): string
+    {
+        return $text;
+    }
+}
+
 if (! class_exists('WP_Error')) {
     class WP_Error
     {

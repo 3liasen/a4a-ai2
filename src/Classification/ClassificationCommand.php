@@ -16,11 +16,11 @@ final class ClassificationCommand
         PromptRepository $prompts,
         AiClientInterface $client,
         ?CategoryRepository $categories = null,
-        ?ClassificationQueueRepository $queueRepository = null
-    )
-    {
+        ?ClassificationQueueRepository $queueRepository = null,
+        ?ClassificationRunner $runner = null
+    ) {
         $this->queueRepository = $queueRepository;
-        $this->runner = new ClassificationRunner($prompts, $client, $categories, $queueRepository);
+        $this->runner = $runner ?? new ClassificationRunner($prompts, $client, $categories, $queueRepository);
     }
 
     public function register(): void
