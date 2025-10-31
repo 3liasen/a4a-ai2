@@ -15,6 +15,7 @@ use Axs4allAi\Classification\ClassificationQueueRepository;
 use Axs4allAi\Classification\PromptRepository;
 use Axs4allAi\Category\CategoryRegistrar;
 use Axs4allAi\Category\CategoryRepository;
+use Axs4allAi\Crawl\CrawlRunner;
 use Axs4allAi\Crawl\CrawlScheduler;
 use Axs4allAi\Data\QueueRepository;
 use Axs4allAi\Infrastructure\Installer;
@@ -27,16 +28,22 @@ final class Plugin
     private CategoryRegistrar $categoryRegistrar;
     private CategoryRepository $categoryRepository;
     private ClassificationQueueRepository $classificationQueueRepository;
+    private CrawlRunner $crawlRunner;
     public function __construct()
     {
         global $wpdb;
 
         $this->queueRepository = new QueueRepository($wpdb);
-        $this->crawlScheduler = new CrawlScheduler($this->queueRepository);
         $this->promptRepository = new PromptRepository($wpdb);
         $this->categoryRegistrar = new CategoryRegistrar();
         $this->categoryRepository = new CategoryRepository();
         $this->classificationQueueRepository = new ClassificationQueueRepository($wpdb);
+        $this->crawlRunner = new CrawlRunner(
+            $this->queueRepository,
+            $this->promptRepository,
+            $this->classificationQueueRepository
+        );
+        $this->crawlScheduler = new CrawlScheduler($this->queueRepository, $this->crawlRunner);
     }
 
     public function boot(): void

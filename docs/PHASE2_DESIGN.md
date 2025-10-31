@@ -73,3 +73,10 @@
 - Real OpenAI chat completions integration via Guzzle with strict yes/no response validation.
 - Metrics (model, token counts, latency) are surfaced with each classification result.
 - Errors propagate back into the queue with sanitised diagnostics for retry control.
+
+### Roadmap Next Steps
+1. ✅ Wire extraction -> classification queue hand-off with logging.
+2. Add cron/WP‑CLI runner configuration for automated job processing.
+3. Surface classification results in admin UI (list view or detail page).
+4. Expand tests for queue lifecycle using mocked OpenAI client.
+5. Add operational controls (model/timeout settings, CLI filters, retry toggles).

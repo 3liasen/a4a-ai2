@@ -11,10 +11,10 @@ final class CrawlScheduler
     private QueueRepository $repository;
     private CrawlRunner $runner;
 
-    public function __construct(QueueRepository $repository)
+    public function __construct(QueueRepository $repository, ?CrawlRunner $runner = null)
     {
         $this->repository = $repository;
-        $this->runner = new CrawlRunner($repository);
+        $this->runner = $runner ?? new CrawlRunner($repository);
     }
 
     public function register(): void
