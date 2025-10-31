@@ -128,6 +128,17 @@ final class QueueRepository
         return (int) $this->wpdb->get_var($sql);
     }
 
+    public function delete(int $id): bool
+    {
+        if ($id <= 0) {
+            return false;
+        }
+
+        $deleted = $this->wpdb->delete($this->table, ['id' => $id], ['%d']);
+
+        return $deleted !== false;
+    }
+
     public function normalizeUrl(string $url): ?string
     {
         $url = trim($url);

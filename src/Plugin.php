@@ -102,7 +102,7 @@ final class Plugin
     private function registerAdminHooks(): void
     {
         $settings = new SettingsPage();
-        $queuePage = new QueuePage($this->queueRepository);
+        $queuePage = new QueuePage($this->queueRepository, $this->clientRepository, $this->categoryRepository);
         $debugPage = new DebugPage();
         $promptPage = new PromptPage($this->promptRepository);
         $categoryPage = new CategoryPage($this->categoryRepository);
