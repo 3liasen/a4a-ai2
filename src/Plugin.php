@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Axs4allAi;
 
 use Axs4allAi\Admin\CategoryPage;
+use Axs4allAi\Admin\ClassificationResultsPage;
 use Axs4allAi\Admin\DebugPage;
 use Axs4allAi\Admin\PromptPage;
 use Axs4allAi\Admin\QueuePage;
@@ -87,12 +88,14 @@ final class Plugin
         $debugPage = new DebugPage();
         $promptPage = new PromptPage($this->promptRepository);
         $categoryPage = new CategoryPage($this->categoryRepository);
+        $classificationPage = new ClassificationResultsPage($this->classificationQueueRepository);
 
         add_action('admin_menu', [$settings, 'registerMenu']);
         add_action('admin_menu', [$queuePage, 'registerMenu']);
         add_action('admin_menu', [$debugPage, 'registerMenu']);
         add_action('admin_menu', [$promptPage, 'registerMenu']);
         add_action('admin_menu', [$categoryPage, 'registerMenu']);
+        add_action('admin_menu', [$classificationPage, 'registerMenu']);
         add_action('admin_init', [$settings, 'registerSettings']);
         add_action('admin_init', [$queuePage, 'registerActions']);
         add_action('admin_init', [$debugPage, 'registerActions']);
@@ -127,3 +130,4 @@ final class Plugin
         return '';
     }
 }
+

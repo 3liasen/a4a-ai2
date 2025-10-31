@@ -173,3 +173,20 @@ final class ClassificationQueueRepository
         return $row !== null ? $row : null;
     }
 }
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getRecentResults(int $limit = 50): array
+    {
+        $limit = max(1, $limit);
+        $sql = $this->wpdb->prepare(
+            "SELECT id, queue_id, extraction_id, decision, confidence, prompt_version, model, tokens_prompt, tokens_completion, duration_ms, created_at
+             FROM {$this->resultsTable}
+             ORDER BY created_at DESC
+             LIMIT %d",
+            $limit
+        );
+
+        $rows = $this->wpdb->get_results($sql, ARRAY_A);
+        return is_array($rows) ? $rows : [];
+    }
