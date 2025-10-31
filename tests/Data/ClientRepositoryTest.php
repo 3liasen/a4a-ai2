@@ -26,6 +26,7 @@ final class ClientRepositoryTest extends TestCase
                 'id' => 9,
                 'client_id' => 5,
                 'url' => 'https://example.com',
+                'crawl_subpages' => 1,
                 'created_at' => '2024-01-01 00:00:00',
                 'updated_at' => '2024-01-01 00:00:00',
             ],
@@ -45,6 +46,7 @@ final class ClientRepositoryTest extends TestCase
         self::assertSame(5, $client['id']);
         self::assertSame('https://example.com', $client['matched_url']);
         self::assertCount(1, $client['urls']);
+        self::assertTrue($client['urls'][0]['crawl_subpages']);
         self::assertContains(12, $client['categories']);
     }
 

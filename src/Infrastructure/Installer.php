@@ -97,6 +97,7 @@ final class Installer
             id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
             client_id BIGINT UNSIGNED NOT NULL,
             url TEXT NOT NULL,
+            crawl_subpages TINYINT(1) NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL,
             updated_at DATETIME NOT NULL,
             PRIMARY KEY (id),

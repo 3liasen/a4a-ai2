@@ -387,4 +387,9 @@ final class ClassificationQueueRepository
 
         return (string) call_user_func_array([$this->wpdb, 'prepare'], $arguments);
     }
+
+    public function findJob(int $id): ?array
+    {
+        return $this->getRow($id);
+    }
 }

@@ -8,6 +8,7 @@ use Axs4allAi\Admin\CategoryPage;
 use Axs4allAi\Admin\ClientPage;
 use Axs4allAi\Admin\ClassificationResultsPage;
 use Axs4allAi\Admin\DebugPage;
+use Axs4allAi\Admin\ManualClassificationPage;
 use Axs4allAi\Admin\PromptPage;
 use Axs4allAi\Admin\QueuePage;
 use Axs4allAi\Admin\SettingsPage;
@@ -105,6 +106,13 @@ final class Plugin
         $queuePage = new QueuePage($this->queueRepository, $this->clientRepository, $this->categoryRepository);
         $debugPage = new DebugPage();
         $promptPage = new PromptPage($this->promptRepository, $this->categoryRepository);
+        $manualPage = new ManualClassificationPage(
+            $this->classificationQueueRepository,
+            $this->classificationRunner,
+            $this->promptRepository,
+            $this->categoryRepository,
+            $this->clientRepository
+        );
         $categoryPage = new CategoryPage($this->categoryRepository);
         $clientPage = new ClientPage($this->clientRepository, $this->categoryRepository);
         $classificationPage = new ClassificationResultsPage($this->classificationQueueRepository);
@@ -116,12 +124,14 @@ final class Plugin
         add_action('admin_menu', [$categoryPage, 'registerMenu']);
         add_action('admin_menu', [$clientPage, 'registerMenu']);
         add_action('admin_menu', [$classificationPage, 'registerMenu']);
+        add_action('admin_menu', [$manualPage, 'registerMenu']);
         add_action('admin_init', [$settings, 'registerSettings']);
         add_action('admin_init', [$queuePage, 'registerActions']);
         add_action('admin_init', [$debugPage, 'registerActions']);
         add_action('admin_init', [$promptPage, 'registerActions']);
         add_action('admin_init', [$categoryPage, 'registerActions']);
         add_action('admin_init', [$clientPage, 'registerActions']);
+        add_action('admin_init', [$manualPage, 'registerActions']);
     }
 
     private function registerCliCommands(): void

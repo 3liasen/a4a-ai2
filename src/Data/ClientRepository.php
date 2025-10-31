@@ -68,6 +68,7 @@ final class ClientRepository
             static fn(array $row): array => [
                 'id' => (int) $row['id'],
                 'url' => (string) $row['url'],
+                'crawl_subpages' => isset($row['crawl_subpages']) ? ((int) $row['crawl_subpages'] === 1) : false,
             ],
             $urls
         );
@@ -150,21 +151,27 @@ final class ClientRepository
         $this->wpdb->delete($this->urlsTable, ['client_id' => $clientId], ['%d']);
 
         $now = current_time('mysql');
-        foreach ($urls as $url) {
-            $sanitized = $this->normalizeUrl((string) $url);
+        foreach ($urls as $urlRow) {
+            if (! is_array($urlRow)) {
+                $urlRow = ['url' => (string) $urlRow];
+            }
+            $sanitized = $this->normalizeUrl((string) ($urlRow['url'] ?? ''));
             if ($sanitized === '') {
                 continue;
             }
+
+            $crawlSubpages = ! empty($urlRow['crawl_subpages']) ? 1 : 0;
 
             $this->wpdb->insert(
                 $this->urlsTable,
                 [
                     'client_id' => $clientId,
                     'url' => $sanitized,
+                    'crawl_subpages' => $crawlSubpages,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ],
-                ['%d', '%s', '%s', '%s']
+                ['%d', '%s', '%d', '%s', '%s']
             );
         }
     }

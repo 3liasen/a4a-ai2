@@ -149,13 +149,21 @@ final class ClientPage
                                         <?php
                                         $urls = $client['urls'] ?? [];
                                         if (empty($urls)) {
-                                            $urls[] = ['url' => ''];
+                                            $urls[] = ['url' => '', 'crawl_subpages' => false];
                                         }
-                                        foreach ($urls as $urlRow) :
+                                        foreach ($urls as $index => $urlRow) :
+                                            $urlValue = isset($urlRow['url']) ? $urlRow['url'] : '';
+                                            $crawlSubpages = ! empty($urlRow['crawl_subpages']);
                                             ?>
-                                            <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem;">
-                                                <input type="url" name="client_urls[]" value="<?php echo esc_attr($urlRow['url']); ?>" class="regular-text" placeholder="<?php esc_attr_e('https://example.com', 'axs4all-ai'); ?>">
-                                                <button type="button" class="button button-secondary axs4all-ai-remove-url"><?php esc_html_e('Remove', 'axs4all-ai'); ?></button>
+                                            <div class="axs4all-ai-client-url" style="margin-bottom:0.75rem;">
+                                                <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+                                                    <input type="url" name="client_urls[<?php echo esc_attr((string) $index); ?>][url]" value="<?php echo esc_attr($urlValue); ?>" class="regular-text" placeholder="<?php esc_attr_e('https://example.com', 'axs4all-ai'); ?>" required>
+                                                    <label style="display:flex; align-items:center; gap:0.35rem; margin:0;">
+                                                        <input type="checkbox" name="client_urls[<?php echo esc_attr((string) $index); ?>][crawl_subpages]" value="1" <?php checked($crawlSubpages); ?>>
+                                                        <?php esc_html_e('Crawl subpages', 'axs4all-ai'); ?>
+                                                    </label>
+                                                    <button type="button" class="button button-secondary axs4all-ai-remove-url"><?php esc_html_e('Remove', 'axs4all-ai'); ?></button>
+                                                </div>
                                             </div>
                                             <?php
                                         endforeach;
@@ -166,24 +174,40 @@ final class ClientPage
                                         document.addEventListener('DOMContentLoaded', function () {
                                             const container = document.getElementById('axs4all-ai-client-urls');
                                             const addButton = document.getElementById('axs4all-ai-add-url');
-                                            if (addButton && container) {
-                                                addButton.addEventListener('click', function () {
-                                                    const wrapper = document.createElement('div');
-                                                    wrapper.style.display = 'flex';
-                                                    wrapper.style.gap = '0.5rem';
-                                                    wrapper.style.marginBottom = '0.5rem';
-                                                    wrapper.innerHTML = '<input type="url" name="client_urls[]" value="" class="regular-text" placeholder="<?php echo esc_js(__('https://example.com', 'axs4all-ai')); ?>"> <button type="button" class="button button-secondary axs4all-ai-remove-url"><?php echo esc_js(__('Remove', 'axs4all-ai')); ?></button>';
-                                                    container.appendChild(wrapper);
-                                                    wrapper.querySelector('.axs4all-ai-remove-url').addEventListener('click', function () {
+                                            if (!container || !addButton) {
+                                                return;
+                                            }
+                                            const template = (index) => `
+                                                <div class="axs4all-ai-client-url" style="margin-bottom:0.75rem;">
+                                                    <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+                                                        <input type="url" name="client_urls[${index}][url]" value="" class="regular-text" placeholder="<?php echo esc_js(__('https://example.com', 'axs4all-ai')); ?>" required>
+                                                        <label style="display:flex; align-items:center; gap:0.35rem; margin:0;">
+                                                            <input type="checkbox" name="client_urls[${index}][crawl_subpages]" value="1">
+                                                            <?php echo esc_js(__('Crawl subpages', 'axs4all-ai')); ?>
+                                                        </label>
+                                                        <button type="button" class="button button-secondary axs4all-ai-remove-url"><?php echo esc_js(__('Remove', 'axs4all-ai')); ?></button>
+                                                    </div>
+                                                </div>
+                                            `;
+
+                                            const bindRemove = (wrapper) => {
+                                                wrapper.querySelectorAll('.axs4all-ai-remove-url').forEach(function (button) {
+                                                    button.addEventListener('click', function () {
                                                         wrapper.remove();
                                                     });
                                                 });
-                                                container.querySelectorAll('.axs4all-ai-remove-url').forEach(function (button) {
-                                                    button.addEventListener('click', function () {
-                                                        button.parentElement.remove();
-                                                    });
-                                                });
-                                            }
+                                            };
+
+                                            // initial rows
+                                            container.querySelectorAll('.axs4all-ai-client-url').forEach(bindRemove);
+
+                                            addButton.addEventListener('click', function () {
+                                                const index = container.querySelectorAll('.axs4all-ai-client-url').length;
+                                                const wrapper = document.createElement('div');
+                                                wrapper.innerHTML = template(index);
+                                                container.appendChild(wrapper.firstElementChild);
+                                                bindRemove(container.lastElementChild);
+                                            });
                                         });
                                     </script>
                                 </td>
@@ -251,8 +275,22 @@ final class ClientPage
             $message = __('Client created.', 'axs4all-ai');
         }
 
-        $urls = isset($_POST['client_urls']) && is_array($_POST['client_urls']) ? array_map('wp_unslash', (array) $_POST['client_urls']) : [];
-        $this->clients->saveUrls($clientId, $urls);
+        $urlsInput = isset($_POST['client_urls']) && is_array($_POST['client_urls']) ? $_POST['client_urls'] : [];
+        $urlPayload = [];
+        foreach ($urlsInput as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $url = isset($row['url']) ? (string) wp_unslash($row['url']) : '';
+            if ($url === '') {
+                continue;
+            }
+            $urlPayload[] = [
+                'url' => $url,
+                'crawl_subpages' => ! empty($row['crawl_subpages']),
+            ];
+        }
+        $this->clients->saveUrls($clientId, $urlPayload);
 
         $categoryInput = isset($_POST['client_categories']) && is_array($_POST['client_categories'])
             ? array_map('intval', array_map('wp_unslash', (array) $_POST['client_categories']))
