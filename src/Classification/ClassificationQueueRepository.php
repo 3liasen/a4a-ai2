@@ -17,12 +17,14 @@ final class ClassificationQueueRepository
     private wpdb $wpdb;
     private string $queueTable;
     private string $resultsTable;
+    private string $crawlTable;
 
     public function __construct(wpdb $wpdb)
     {
         $this->wpdb = $wpdb;
         $this->queueTable = $this->wpdb->prefix . 'axs4all_ai_classifications_queue';
         $this->resultsTable = $this->wpdb->prefix . 'axs4all_ai_classifications';
+        $this->crawlTable = $this->wpdb->prefix . 'axs4all_ai_queue';
     }
 
     public function enqueue(
@@ -217,9 +219,16 @@ final class ClassificationQueueRepository
         $params[] = $offset;
 
         $sql = "
-            SELECT r.*, q.source_url, q.category
+            SELECT r.*, cq.category, queue.source_url
             FROM {$this->resultsTable} r
-            LEFT JOIN {$this->queueTable} q ON q.id = r.queue_id
+            LEFT JOIN {$this->queueTable} cq
+                ON cq.queue_id = r.queue_id
+                AND (
+                    (cq.category_id > 0 AND cq.category_id = r.category_id)
+                    OR (cq.category_id = 0 AND (r.category_id IS NULL OR r.category_id = 0))
+                )
+                AND cq.prompt_version = r.prompt_version
+            LEFT JOIN {$this->crawlTable} queue ON queue.id = r.queue_id
             WHERE 1=1 {$whereClause}
             ORDER BY r.created_at DESC
             LIMIT %d OFFSET %d
@@ -241,7 +250,14 @@ final class ClassificationQueueRepository
         $sql = "
             SELECT COUNT(*)
             FROM {$this->resultsTable} r
-            LEFT JOIN {$this->queueTable} q ON q.id = r.queue_id
+            LEFT JOIN {$this->queueTable} cq
+                ON cq.queue_id = r.queue_id
+                AND (
+                    (cq.category_id > 0 AND cq.category_id = r.category_id)
+                    OR (cq.category_id = 0 AND (r.category_id IS NULL OR r.category_id = 0))
+                )
+                AND cq.prompt_version = r.prompt_version
+            LEFT JOIN {$this->crawlTable} queue ON queue.id = r.queue_id
             WHERE 1=1 {$whereClause}
         ";
 
@@ -255,9 +271,16 @@ final class ClassificationQueueRepository
     {
         $sql = $this->wpdb->prepare(
             "
-            SELECT r.*, q.source_url, q.category, q.content
+            SELECT r.*, cq.category, cq.content, queue.source_url
             FROM {$this->resultsTable} r
-            LEFT JOIN {$this->queueTable} q ON q.id = r.queue_id
+            LEFT JOIN {$this->queueTable} cq
+                ON cq.queue_id = r.queue_id
+                AND (
+                    (cq.category_id > 0 AND cq.category_id = r.category_id)
+                    OR (cq.category_id = 0 AND (r.category_id IS NULL OR r.category_id = 0))
+                )
+                AND cq.prompt_version = r.prompt_version
+            LEFT JOIN {$this->crawlTable} queue ON queue.id = r.queue_id
             WHERE r.id = %d
             LIMIT 1
             ",
@@ -322,7 +345,7 @@ final class ClassificationQueueRepository
         $search = isset($filters['search']) ? trim((string) $filters['search']) : '';
         if ($search !== '') {
             $like = '%' . esc_like($search) . '%';
-            $clauses[] = 'AND (r.raw_response LIKE %s OR q.source_url LIKE %s)';
+            $clauses[] = 'AND (r.raw_response LIKE %s OR queue.source_url LIKE %s)';
             $params[] = $like;
             $params[] = $like;
 

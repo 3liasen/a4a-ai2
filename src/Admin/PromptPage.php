@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Axs4allAi\Admin;
 
+use Axs4allAi\Category\CategoryRepository;
 use Axs4allAi\Classification\PromptRepository;
 
 final class PromptPage
@@ -16,10 +17,12 @@ final class PromptPage
     private const NONCE_TOGGLE = 'axs4all_ai_prompt_toggle';
 
     private PromptRepository $repository;
+    private ?CategoryRepository $categories;
 
-    public function __construct(PromptRepository $repository)
+    public function __construct(PromptRepository $repository, ?CategoryRepository $categories = null)
     {
         $this->repository = $repository;
+        $this->categories = $categories;
     }
 
     public function registerMenu(): void
@@ -138,8 +141,20 @@ final class PromptPage
                                     <label for="axs4all-ai-prompt-category"><?php esc_html_e('Category', 'axs4all-ai'); ?></label>
                                 </th>
                                 <td>
-                                    <input type="text" class="regular-text" name="prompt_category" id="axs4all-ai-prompt-category" value="<?php echo esc_attr($editPrompt ? $editPrompt->category() : 'default'); ?>" <?php echo $editPrompt ? 'readonly' : ''; ?>>
-                                    <p class="description"><?php esc_html_e('Use lowercase identifiers (e.g. "restaurant"). "default" applies when no specific category matches.', 'axs4all-ai'); ?></p>
+                                    <?php
+                                    $categoryOptions = $this->getCategoryOptions();
+                                    $currentCategory = $editPrompt ? $editPrompt->category() : 'default';
+                                    if ($currentCategory !== '' && ! isset($categoryOptions[$currentCategory])) {
+                                        $categoryOptions[$currentCategory] = $currentCategory;
+                                    }
+                                    ?>
+                                    <input type="text" class="regular-text" name="prompt_category" id="axs4all-ai-prompt-category" list="axs4all-ai-prompt-category-list" value="<?php echo esc_attr($currentCategory); ?>" <?php echo $editPrompt ? 'readonly' : ''; ?>>
+                                    <datalist id="axs4all-ai-prompt-category-list">
+                                        <?php foreach ($categoryOptions as $value => $label) : ?>
+                                            <option value="<?php echo esc_attr($value); ?>" label="<?php echo esc_attr($label); ?>"></option>
+                                        <?php endforeach; ?>
+                                    </datalist>
+                                    <p class="description"><?php esc_html_e('Choose a category identifier. Select from existing categories or enter a custom slug. "default" applies when no specific category matches.', 'axs4all-ai'); ?></p>
                                 </td>
                             </tr>
                             <tr>
@@ -273,6 +288,35 @@ final class PromptPage
         exit;
     }
 
+    /**
+     * @return array<string, string>
+     */
+    private function getCategoryOptions(): array
+    {
+        $options = [
+            'default' => __('default (fallback)', 'axs4all-ai'),
+        ];
+
+        $customOptions = [];
+        if ($this->categories instanceof CategoryRepository) {
+            foreach ($this->categories->all() as $category) {
+                $name = (string) $category['name'];
+                $slug = sanitize_title($name);
+                if ($slug === '') {
+                    $slug = sanitize_title_with_dashes($name);
+                }
+                if ($slug === '' || isset($customOptions[$slug]) || $slug === 'default') {
+                    continue;
+                }
+                $customOptions[$slug] = sprintf('%s (%s)', $name, $slug);
+            }
+        }
+
+        ksort($customOptions);
+
+        return $options + $customOptions;
+    }
+
     private function renderNotices(?string $message, ?string $error): void
     {
         if ($message !== null && $message !== '') {
@@ -284,3 +328,4 @@ final class PromptPage
         }
     }
 }
+

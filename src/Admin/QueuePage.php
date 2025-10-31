@@ -304,9 +304,14 @@ final class QueuePage
         $all = $this->categories->all();
         $map = [];
         foreach ($all as $category) {
+            $name = (string) $category['name'];
+            $value = sanitize_title($name);
+            if ($value === '') {
+                $value = sanitize_title_with_dashes($name);
+            }
             $map[(int) $category['id']] = [
-                'name' => $category['name'],
-                'value' => $category['name'],
+                'name' => $name,
+                'value' => $value,
             ];
         }
 
