@@ -12,6 +12,7 @@ use Axs4allAi\Admin\ManualClassificationPage;
 use Axs4allAi\Admin\PromptPage;
 use Axs4allAi\Admin\QueuePage;
 use Axs4allAi\Admin\SettingsPage;
+use Axs4allAi\Admin\BillingPage;
 use Axs4allAi\Ai\OpenAiClient;
 use Axs4allAi\Classification\ClassificationCommand;
 use Axs4allAi\Classification\ClassificationQueueRepository;
@@ -113,6 +114,7 @@ final class Plugin
             $this->categoryRepository,
             $this->clientRepository
         );
+        $billingPage = new BillingPage($this->classificationQueueRepository);
         $categoryPage = new CategoryPage($this->categoryRepository);
         $clientPage = new ClientPage($this->clientRepository, $this->categoryRepository);
         $classificationPage = new ClassificationResultsPage($this->classificationQueueRepository);
@@ -125,6 +127,7 @@ final class Plugin
         add_action('admin_menu', [$clientPage, 'registerMenu']);
         add_action('admin_menu', [$classificationPage, 'registerMenu']);
         add_action('admin_menu', [$manualPage, 'registerMenu']);
+        add_action('admin_menu', [$billingPage, 'registerMenu']);
         add_action('admin_init', [$settings, 'registerSettings']);
         add_action('admin_init', [$queuePage, 'registerActions']);
         add_action('admin_init', [$debugPage, 'registerActions']);
