@@ -53,35 +53,71 @@ if (! class_exists('wpdb')) {
         public string $prefix = 'wp_';
         public int $insert_id = 0;
 
+        /** @var array<int, array<string, mixed>> */
+        public array $insertLog = [];
+        /** @var array<int, array<string, mixed>> */
+        public array $updateLog = [];
+        /** @var array<int, array<string, mixed>> */
+        public array $queryLog = [];
+        /** @var array<int, mixed> */
+        public array $getRowQueue = [];
+        /** @var array<int, mixed> */
+        public array $getResultsQueue = [];
+        /** @var array<int, mixed> */
+        public array $getColQueue = [];
+        /** @var array<int, mixed> */
+        public array $getVarQueue = [];
+
         public function insert($table, $data, $format = null)
         {
+            $this->insertLog[] = compact('table', 'data', 'format');
+            $this->insert_id++;
+            return true;
         }
 
         public function update($table, $data, $where, $format = null, $whereFormat = null)
         {
+            $this->updateLog[] = compact('table', 'data', 'where', 'format', 'whereFormat');
+            return 1;
         }
 
         public function get_col($query)
         {
+            $this->queryLog[] = ['type' => 'get_col', 'query' => $query];
+            $result = array_shift($this->getColQueue);
+            return $result !== null ? $result : [];
         }
 
         public function get_row($query, $output = ARRAY_A)
         {
+            $this->queryLog[] = ['type' => 'get_row', 'query' => $query];
+            $result = array_shift($this->getRowQueue);
+            return $result !== null ? $result : null;
+        }
+
+        public function get_results($query, $output = ARRAY_A)
+        {
+            $this->queryLog[] = ['type' => 'get_results', 'query' => $query];
+            $result = array_shift($this->getResultsQueue);
+            return $result !== null ? $result : [];
+        }
+
+        public function get_var($query)
+        {
+            $this->queryLog[] = ['type' => 'get_var', 'query' => $query];
+            return array_shift($this->getVarQueue);
         }
 
         public function query($query)
         {
+            $this->queryLog[] = ['type' => 'query', 'query' => $query];
+            return 1;
         }
 
         public function prepare($query, ...$args)
         {
-            foreach ($args as &$arg) {
-                if (is_string($arg)) {
-                    $arg = addslashes($arg);
-                }
-            }
-
-            return vsprintf(str_replace(['%s', '%d', '%f'], ['%s', '%d', '%f'], $query), $args);
+            $this->queryLog[] = ['type' => 'prepare', 'query' => $query, 'args' => $args];
+            return $query;
         }
     }
 }
@@ -186,6 +222,32 @@ if (! function_exists('__')) {
     function __(string $text, string $domain = 'default'): string
     {
         return $text;
+    }
+}
+
+if (! defined('WP_CLI')) {
+    define('WP_CLI', false);
+}
+
+if (! class_exists('WP_CLI')) {
+    class WP_CLI
+    {
+        public static array $messages = [];
+
+        public static function log(string $message): void
+        {
+            self::$messages[] = $message;
+        }
+
+        public static function success(string $message): void
+        {
+            self::$messages[] = $message;
+        }
+
+        public static function error(string $message): void
+        {
+            throw new \RuntimeException($message);
+        }
     }
 }
 
