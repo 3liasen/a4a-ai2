@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Axs4allAi\Admin;
 
+use Axs4allAi\Infrastructure\ExchangeRateUpdater;
+
 final class SettingsPage
 {
     private const OPTION_GROUP = 'axs4all_ai_settings_group';
@@ -75,6 +77,22 @@ final class SettingsPage
         );
 
         add_settings_field(
+            'axs4all_ai_prompt_price',
+            __('Prompt Cost (USD / 1M tokens)', 'axs4all-ai'),
+            [$this, 'renderPromptPriceField'],
+            'axs4all-ai',
+            'axs4all_ai_classification_section'
+        );
+
+        add_settings_field(
+            'axs4all_ai_completion_price',
+            __('Completion Cost (USD / 1M tokens)', 'axs4all-ai'),
+            [$this, 'renderCompletionPriceField'],
+            'axs4all-ai',
+            'axs4all_ai_classification_section'
+        );
+
+        add_settings_field(
             'axs4all_ai_timeout',
             __('Request Timeout (seconds)', 'axs4all-ai'),
             [$this, 'renderTimeoutField'],
@@ -94,6 +112,22 @@ final class SettingsPage
             'axs4all_ai_max_attempts',
             __('Max Attempts', 'axs4all-ai'),
             [$this, 'renderMaxAttemptsField'],
+            'axs4all-ai',
+            'axs4all_ai_classification_section'
+        );
+
+        add_settings_field(
+            'axs4all_ai_exchange_rate_auto',
+            __('Auto-fetch USD to DKK rate', 'axs4all-ai'),
+            [$this, 'renderExchangeRateAutoField'],
+            'axs4all-ai',
+            'axs4all_ai_classification_section'
+        );
+
+        add_settings_field(
+            'axs4all_ai_exchange_rate',
+            __('USD to DKK rate', 'axs4all-ai'),
+            [$this, 'renderExchangeRateField'],
             'axs4all-ai',
             'axs4all_ai_classification_section'
         );
@@ -123,6 +157,12 @@ final class SettingsPage
         $temperature = isset($input['temperature']) ? (float) $input['temperature'] : ($existing['temperature'] ?? 0.0);
         $output['temperature'] = max(0.0, min(2.0, $temperature));
 
+        $promptPrice = isset($input['prompt_price']) ? (float) $input['prompt_price'] : ($existing['prompt_price'] ?? 0.15);
+        $output['prompt_price'] = max(0.0, $promptPrice);
+
+        $completionPrice = isset($input['completion_price']) ? (float) $input['completion_price'] : ($existing['completion_price'] ?? 0.60);
+        $output['completion_price'] = max(0.0, $completionPrice);
+
         $timeout = isset($input['timeout']) ? (int) $input['timeout'] : ($existing['timeout'] ?? 30);
         $output['timeout'] = max(5, min(300, $timeout));
 
@@ -131,6 +171,24 @@ final class SettingsPage
 
         $maxAttempts = isset($input['max_attempts']) ? (int) $input['max_attempts'] : ($existing['max_attempts'] ?? 3);
         $output['max_attempts'] = max(1, min(10, $maxAttempts));
+
+        $exchangeRateAuto = ! empty($input['exchange_rate_auto']);
+        $output['exchange_rate_auto'] = $exchangeRateAuto ? 1 : 0;
+
+        $manualRate = isset($input['exchange_rate']) ? (float) $input['exchange_rate'] : ($existing['exchange_rate'] ?? 0.0);
+        $manualRate = max(0.0, $manualRate);
+
+        if ($exchangeRateAuto) {
+            $stored = ExchangeRateUpdater::getStoredRate();
+            if (is_array($stored) && isset($stored['rate'])) {
+                $manualRate = (float) $stored['rate'];
+            }
+        } elseif ($manualRate > 0) {
+            ExchangeRateUpdater::storeRate($manualRate);
+        } else {
+            ExchangeRateUpdater::storeRate(0.0);
+        }
+        $output['exchange_rate'] = $manualRate;
 
         return $output;
     }
@@ -208,6 +266,90 @@ final class SettingsPage
         echo '<p class="description">' . esc_html__('Controls response randomness. Use 0 for deterministic outputs; higher values increase variation (max 2).', 'axs4all-ai') . '</p>';
     }
 
+    public function renderPromptPriceField(): void
+    {
+        $options = get_option(self::OPTION_NAME, []);
+        $value = isset($options['prompt_price']) ? (float) $options['prompt_price'] : 0.15;
+
+        printf(
+            '<input type="number" name="%1$s[prompt_price]" value="%2$s" min="0" step="0.01" />',
+            esc_attr(self::OPTION_NAME),
+            esc_attr(number_format($value, 4, '.', ''))
+        );
+        echo '<p class="description">' . esc_html__('Cost per 1 million prompt tokens in USD (default 0.15 for GPT-4o mini).', 'axs4all-ai') . '</p>';
+    }
+
+    public function renderCompletionPriceField(): void
+    {
+        $options = get_option(self::OPTION_NAME, []);
+        $value = isset($options['completion_price']) ? (float) $options['completion_price'] : 0.60;
+
+        printf(
+            '<input type="number" name="%1$s[completion_price]" value="%2$s" min="0" step="0.01" />',
+            esc_attr(self::OPTION_NAME),
+            esc_attr(number_format($value, 4, '.', ''))
+        );
+        echo '<p class="description">' . esc_html__('Cost per 1 million completion tokens in USD (default 0.60 for GPT-4o mini).', 'axs4all-ai') . '</p>';
+    }
+
+    public function renderExchangeRateAutoField(): void
+    {
+        $options = get_option(self::OPTION_NAME, []);
+        $auto = ! empty($options['exchange_rate_auto']);
+        $stored = ExchangeRateUpdater::getStoredRate();
+        $lastUpdated = $stored['updated_at'] ?? '';
+        $lastUpdatedFormatted = '';
+        if ($lastUpdated) {
+            $timestamp = strtotime($lastUpdated);
+            if ($timestamp !== false) {
+                $lastUpdatedFormatted = date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $timestamp);
+            }
+        }
+
+        printf(
+            '<label><input type="checkbox" name="%1$s[exchange_rate_auto]" value="1" %2$s> %3$s</label>',
+            esc_attr(self::OPTION_NAME),
+            checked($auto, true, false),
+            esc_html__('Automatically fetch USD to DKK rate daily (via exchangerate.host).', 'axs4all-ai')
+        );
+
+        if ($lastUpdatedFormatted !== '') {
+            echo '<p class="description">' .
+                esc_html(sprintf(__('Last automatic update: %s', 'axs4all-ai'), $lastUpdatedFormatted)) .
+                '</p>';
+        } else {
+            echo '<p class="description">' . esc_html__('Last automatic update: never', 'axs4all-ai') . '</p>';
+        }
+    }
+
+    public function renderExchangeRateField(): void
+    {
+        $options = get_option(self::OPTION_NAME, []);
+        $value = isset($options['exchange_rate']) ? (float) $options['exchange_rate'] : 0.0;
+        $stored = ExchangeRateUpdater::getStoredRate();
+        $source = ! empty($options['exchange_rate_auto']) ? __('Automatic', 'axs4all-ai') : __('Manual', 'axs4all-ai');
+        $lastUpdated = $stored['updated_at'] ?? '';
+        $lastUpdatedFormatted = '';
+        if ($lastUpdated) {
+            $timestamp = strtotime($lastUpdated);
+            if ($timestamp !== false) {
+                $lastUpdatedFormatted = date_i18n(get_option('date_format') . ' ' . get_option('time_format'), $timestamp);
+            }
+        }
+
+        printf(
+            '<input type="number" name="%1$s[exchange_rate]" value="%2$s" min="0" step="0.0001" />',
+            esc_attr(self::OPTION_NAME),
+            esc_attr(number_format($value, 4, '.', ''))
+        );
+        echo '<p class="description">' . esc_html__('Current USD to DKK conversion rate. Used for cost estimates.', 'axs4all-ai') . '</p>';
+        if ($lastUpdatedFormatted !== '') {
+            echo '<p class="description">' .
+                esc_html(sprintf(__('Rate source: %1$s. Last update: %2$s', 'axs4all-ai'), $source, $lastUpdatedFormatted)) .
+                '</p>';
+        }
+    }
+
     public function renderTimeoutField(): void
     {
         $options = get_option(self::OPTION_NAME, []);
@@ -260,3 +402,5 @@ final class SettingsPage
         return 'unset';
     }
 }
+
+

@@ -300,6 +300,57 @@ final class ClassificationQueueRepository
         ];
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<int, array{label:string,prompt_tokens:int,completion_tokens:int}>
+     */
+    public function getTokenTimeline(array $filters = [], string $granularity = 'day', int $limit = 30): array
+    {
+        [$whereClause, $params] = $this->buildFilterClause($filters);
+
+        $limit = max(1, $limit);
+        $labelSelect = "DATE(r.created_at)";
+        if ($granularity === 'month') {
+            $labelSelect = "DATE_FORMAT(r.created_at, '%Y-%m-01')";
+        }
+
+        $sql = "
+            SELECT
+                {$labelSelect} AS label,
+                COALESCE(SUM(r.tokens_prompt), 0) AS prompt_tokens,
+                COALESCE(SUM(r.tokens_completion), 0) AS completion_tokens
+            FROM {$this->resultsTable} r
+            LEFT JOIN {$this->queueTable} cq
+                ON cq.queue_id = r.queue_id
+                AND (
+                    (cq.category_id > 0 AND cq.category_id = r.category_id)
+                    OR (cq.category_id = 0 AND (r.category_id IS NULL OR r.category_id = 0))
+                )
+                AND cq.prompt_version = r.prompt_version
+            LEFT JOIN {$this->crawlTable} queue ON queue.id = r.queue_id
+            WHERE 1=1 {$whereClause}
+            GROUP BY label
+            ORDER BY label DESC
+            LIMIT %d
+        ";
+
+        $params[] = $limit;
+        $prepared = $this->prepare($sql, $params);
+        $rows = $this->wpdb->get_results($prepared, ARRAY_A) ?: [];
+        $rows = array_reverse($rows);
+
+        return array_map(
+            static function (array $row): array {
+                return [
+                    'label' => (string) $row['label'],
+                    'prompt_tokens' => (int) $row['prompt_tokens'],
+                    'completion_tokens' => (int) $row['completion_tokens'],
+                ];
+            },
+            $rows
+        );
+    }
+
     public function getResult(int $id): ?array
     {
         $sql = $this->wpdb->prepare(

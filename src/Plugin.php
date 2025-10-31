@@ -26,6 +26,7 @@ use Axs4allAi\Crawl\CrawlScheduler;
 use Axs4allAi\Data\ClientRepository;
 use Axs4allAi\Data\QueueRepository;
 use Axs4allAi\Infrastructure\Installer;
+use Axs4allAi\Infrastructure\ExchangeRateUpdater;
 
 final class Plugin
 {
@@ -40,6 +41,7 @@ final class Plugin
     private ClassificationScheduler $classificationScheduler;
     private CrawlRunner $crawlRunner;
     private ClientRepository $clientRepository;
+    private ExchangeRateUpdater $exchangeRateUpdater;
     private array $settings;
     public function __construct()
     {
@@ -51,6 +53,7 @@ final class Plugin
         $this->categoryRepository = new CategoryRepository();
         $this->classificationQueueRepository = new ClassificationQueueRepository($wpdb);
         $this->clientRepository = new ClientRepository($wpdb);
+        $this->exchangeRateUpdater = new ExchangeRateUpdater();
         $this->settings = $this->loadSettings();
         $apiKey = $this->resolveApiKey();
         $this->aiClient = new OpenAiClient(
@@ -98,6 +101,7 @@ final class Plugin
         $this->registerAdminHooks();
         $this->crawlScheduler->register();
         $this->classificationScheduler->register();
+        $this->exchangeRateUpdater->register();
         $this->registerCliCommands();
     }
 
