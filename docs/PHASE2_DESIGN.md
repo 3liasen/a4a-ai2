@@ -76,8 +76,10 @@
 
 ### Roadmap Next Steps
 1. [done] Wire extraction -> classification queue hand-off with logging.
-2. Add cron/WP-CLI runner configuration for automated job processing.
-3. Surface classification results in admin UI (list view or detail page).
+2. [done] Add cron/WP-CLI runner configuration for automated job processing.
+3. Enhance classification results UI (filters, detail view).
 4. [done] Expand tests for queue lifecycle using mocked OpenAI client.
 5. Add operational controls (model/timeout settings, CLI filters, retry toggles).
+
+
 
