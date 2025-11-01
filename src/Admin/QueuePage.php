@@ -7,18 +7,26 @@ namespace Axs4allAi\Admin;
 use Axs4allAi\Category\CategoryRepository;
 use Axs4allAi\Data\ClientRepository;
 use Axs4allAi\Data\QueueRepository;
+use Axs4allAi\Data\SnapshotRepository;
 
 final class QueuePage
 {
     private QueueRepository $repository;
     private ClientRepository $clients;
     private CategoryRepository $categories;
+    private ?SnapshotRepository $snapshots;
 
-    public function __construct(QueueRepository $repository, ClientRepository $clients, CategoryRepository $categories)
+    public function __construct(
+        QueueRepository $repository,
+        ClientRepository $clients,
+        CategoryRepository $categories,
+        ?SnapshotRepository $snapshots = null
+    )
     {
         $this->repository = $repository;
         $this->clients = $clients;
         $this->categories = $categories;
+        $this->snapshots = $snapshots;
     }
 
     public function registerMenu(): void
@@ -51,6 +59,9 @@ final class QueuePage
         $clientUrls = $this->gatherClientUrlRows();
         $clientOptions = $this->getClientOptions();
         $categoryOptions = $this->buildCategoryMap();
+        $snapshotMap = $this->snapshots instanceof SnapshotRepository
+            ? $this->buildSnapshotMap($recent)
+            : [];
 
         ?>
         <div class="wrap">
@@ -140,13 +151,14 @@ final class QueuePage
                         <th><?php esc_html_e('Attempts', 'axs4all-ai'); ?></th>
                         <th><?php esc_html_e('Created', 'axs4all-ai'); ?></th>
                         <th><?php esc_html_e('Updated', 'axs4all-ai'); ?></th>
+                        <th><?php esc_html_e('Latest Snapshot', 'axs4all-ai'); ?></th>
                         <th><?php esc_html_e('Actions', 'axs4all-ai'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php if (empty($recent)) : ?>
                     <tr>
-                        <td colspan="10"><?php esc_html_e('No queue items yet.', 'axs4all-ai'); ?></td>
+                        <td colspan="11"><?php esc_html_e('No queue items yet.', 'axs4all-ai'); ?></td>
                     </tr>
                 <?php else : ?>
                     <?php foreach ($recent as $item) : ?>
@@ -160,6 +172,27 @@ final class QueuePage
                             <td><?php echo esc_html((string) $item['attempts']); ?></td>
                             <td><?php echo esc_html($item['created_at']); ?></td>
                             <td><?php echo esc_html($item['updated_at']); ?></td>
+                            <td>
+                                <?php
+                                $snapshot = $snapshotMap[$item['id']] ?? null;
+                                if ($snapshot === null) {
+                                    echo '&mdash;';
+                                } else {
+                                    $snapshotUrl = add_query_arg(
+                                        [
+                                            'page' => 'axs4all-ai-debug',
+                                            'snapshot_id' => (int) $snapshot['id'],
+                                        ],
+                                        admin_url('admin.php')
+                                    );
+                                    printf(
+                                        '<a href="%s">%s</a>',
+                                        esc_url($snapshotUrl),
+                                        esc_html((string) $snapshot['fetched_at'])
+                                    );
+                                }
+                                ?>
+                            </td>
                             <td>
                                 <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('<?php echo esc_js(__('Remove this queue item?', 'axs4all-ai')); ?>');">
                                     <?php wp_nonce_field('axs4all_ai_delete_queue_' . (int) $item['id']); ?>
@@ -417,6 +450,32 @@ final class QueuePage
         }
 
         return $rows;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $recent
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildSnapshotMap(array $recent): array
+    {
+        if ($this->snapshots === null) {
+            return [];
+        }
+
+        $map = [];
+        foreach ($recent as $item) {
+            $queueId = isset($item['id']) ? (int) $item['id'] : 0;
+            if ($queueId <= 0 || isset($map[$queueId])) {
+                continue;
+            }
+
+            $latest = $this->snapshots->findByQueue($queueId, 1);
+            if (! empty($latest)) {
+                $map[$queueId] = $latest[0];
+            }
+        }
+
+        return $map;
     }
 
     /**

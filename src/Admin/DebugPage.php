@@ -14,6 +14,7 @@ final class DebugPage
     private const DOWNLOAD_ACTION = 'axs4all_ai_download_log';
     private const NONCE_ACTION = 'axs4all_ai_debug_log_action';
     private const CLEAR_EVENTS_ACTION = 'axs4all_ai_clear_debug_events';
+    private const CLEAR_SNAPSHOTS_ACTION = 'axs4all_ai_clear_snapshots';
 
     private ?SnapshotRepository $snapshots;
     private ?DebugLogger $logger;
@@ -41,6 +42,7 @@ final class DebugPage
         add_action('admin_post_' . self::CLEAR_ACTION, [$this, 'handleClear']);
         add_action('admin_post_' . self::DOWNLOAD_ACTION, [$this, 'handleDownload']);
         add_action('admin_post_' . self::CLEAR_EVENTS_ACTION, [$this, 'handleClearEvents']);
+        add_action('admin_post_' . self::CLEAR_SNAPSHOTS_ACTION, [$this, 'handleClearSnapshots']);
     }
 
     public function render(): void
@@ -169,6 +171,14 @@ final class DebugPage
                 <p class="description">
                     <?php esc_html_e('These are the last pages captured by the crawler. Use them to double-check what the extractor and classifier received.', 'axs4all-ai'); ?>
                 </p>
+
+                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom: 0.75rem;">
+                    <?php wp_nonce_field(self::NONCE_ACTION); ?>
+                    <input type="hidden" name="action" value="<?php echo esc_attr(self::CLEAR_SNAPSHOTS_ACTION); ?>">
+                    <button type="submit" class="button button-secondary" onclick="return confirm('<?php echo esc_js(__('Delete all stored snapshots? This only removes cached HTML.', 'axs4all-ai')); ?>');">
+                        <?php esc_html_e('Clear Snapshots', 'axs4all-ai'); ?>
+                    </button>
+                </form>
 
                 <?php if (empty($recentSnapshots)) : ?>
                     <p><?php esc_html_e('No crawl snapshots stored yet.', 'axs4all-ai'); ?></p>
@@ -318,6 +328,21 @@ final class DebugPage
 
         $this->logger->clear();
         $this->redirectWithMessage('debug_log_message', __('Crawler events cleared.', 'axs4all-ai'));
+    }
+
+    public function handleClearSnapshots(): void
+    {
+        $authorized = $this->ensureAuthorized();
+        if ($authorized instanceof \WP_Error) {
+            wp_die($authorized);
+        }
+
+        if (! $this->snapshots instanceof SnapshotRepository) {
+            $this->redirectWithMessage('debug_log_error', __('Snapshots are not available.', 'axs4all-ai'));
+        }
+
+        $this->snapshots->clearAll();
+        $this->redirectWithMessage('debug_log_message', __('All snapshots cleared.', 'axs4all-ai'));
     }
 
     private function resolveLogPath(): ?string

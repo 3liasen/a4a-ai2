@@ -129,6 +129,13 @@ final class CrawlRunner
                         continue;
                     }
 
+                    $this->log('extract_result', 'Snippets extracted', [
+                        'queue_id' => $queueId,
+                        'category' => $categoryName,
+                        'page' => $pageUrl,
+                        'snippet_count' => count($snippets),
+                    ]);
+
                     $promptVersion = 'v1';
                     if ($this->promptRepository !== null) {
                         $template = $this->promptRepository->getActiveTemplate($categoryName);

@@ -31,6 +31,8 @@ final class SnapshotRepository
             ],
             ['%d', '%s', '%s', '%s']
         );
+
+        $this->pruneQueueSnapshots($queueId);
     }
 
     /**
@@ -93,5 +95,34 @@ final class SnapshotRepository
         $rows = $this->wpdb->get_results($query, ARRAY_A) ?: [];
 
         return $rows;
+    }
+
+    public function clearAll(): void
+    {
+        $this->wpdb->query("DELETE FROM {$this->table}");
+    }
+
+    private function pruneQueueSnapshots(int $queueId, int $retain = 20): void
+    {
+        $queueId = max(1, $queueId);
+        $retain = max(1, $retain);
+
+        $this->wpdb->query(
+            $this->wpdb->prepare(
+                "DELETE FROM {$this->table}
+                 WHERE queue_id = %d
+                 AND id NOT IN (
+                    SELECT id FROM (
+                        SELECT id FROM {$this->table}
+                        WHERE queue_id = %d
+                        ORDER BY fetched_at DESC, id DESC
+                        LIMIT %d
+                    ) AS keepers
+                 )",
+                $queueId,
+                $queueId,
+                $retain
+            )
+        );
     }
 }
