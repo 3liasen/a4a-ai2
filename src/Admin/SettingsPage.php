@@ -202,9 +202,11 @@ final class SettingsPage
             ExchangeRateUpdater::storeRate(0.0);
         }
         $output['exchange_rate'] = $manualRate;
-        $output['exchange_rate_api_key'] = isset($input['exchange_rate_api_key'])
-            ? sanitize_text_field((string) $input['exchange_rate_api_key'])
+
+        $apiKeyInput = isset($input['exchange_rate_api_key'])
+            ? (string) $input['exchange_rate_api_key']
             : ($existing['exchange_rate_api_key'] ?? '');
+        $output['exchange_rate_api_key'] = $this->normalizeExchangeRateAccessKey($apiKeyInput);
 
         return $output;
     }
@@ -490,6 +492,33 @@ final class SettingsPage
         }
 
         return 'unset';
+    }
+
+    private function normalizeExchangeRateAccessKey(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        // If the user pastes a full URL, extract the query string first.
+        $parsed = parse_url($value);
+        if (is_array($parsed) && isset($parsed['query'])) {
+            parse_str($parsed['query'], $params);
+            if (isset($params['access_key'])) {
+                return sanitize_text_field((string) $params['access_key']);
+            }
+        }
+
+        // Handle raw query fragments such as "access_key=abc123".
+        if (strpos($value, 'access_key=') !== false) {
+            parse_str($value, $params);
+            if (isset($params['access_key'])) {
+                return sanitize_text_field((string) $params['access_key']);
+            }
+        }
+
+        return sanitize_text_field($value);
     }
 }
 
