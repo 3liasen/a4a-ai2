@@ -172,6 +172,14 @@ final class SettingsPage
             'axs4all-ai',
             'axs4all_ai_alerts_section'
         );
+
+        add_settings_field(
+            'axs4all_ai_alert_ticket_webhook',
+            __('Ticketing Webhook', 'axs4all-ai'),
+            [$this, 'renderAlertTicketField'],
+            'axs4all-ai',
+            'axs4all_ai_alerts_section'
+        );
     }
 
     public function registerActions(): void
@@ -249,6 +257,12 @@ final class SettingsPage
         $output['alert_slack_webhook'] = esc_url_raw((string) ($input['alert_slack_webhook'] ?? ''));
         $thresholdInput = isset($input['alert_queue_threshold']) ? (int) $input['alert_queue_threshold'] : ($existing['alert_queue_threshold'] ?? 0);
         $output['alert_queue_threshold'] = max(0, $thresholdInput);
+
+        $output['alert_ticket_webhook'] = esc_url_raw((string) ($input['alert_ticket_webhook'] ?? ($existing['alert_ticket_webhook'] ?? '')));
+
+        $output['alert_email_min_severity'] = $this->sanitizeSeverity((string) ($input['alert_email_min_severity'] ?? ($existing['alert_email_min_severity'] ?? 'warning')));
+        $output['alert_slack_min_severity'] = $this->sanitizeSeverity((string) ($input['alert_slack_min_severity'] ?? ($existing['alert_slack_min_severity'] ?? 'warning')));
+        $output['alert_ticket_min_severity'] = $this->sanitizeSeverity((string) ($input['alert_ticket_min_severity'] ?? ($existing['alert_ticket_min_severity'] ?? 'critical')));
 
         return $output;
     }
@@ -562,11 +576,19 @@ final class SettingsPage
 
         return sanitize_text_field($value);
     }
- 
+
+    private function sanitizeSeverity(string $value): string
+    {
+        $value = strtolower(trim($value));
+        $allowed = ['info', 'warning', 'critical'];
+        return in_array($value, $allowed, true) ? $value : 'warning';
+    }
+
     public function renderAlertEmailField(): void
     {
         $options = get_option(self::OPTION_NAME, []);
         $value = isset($options['alert_email']) ? (string) $options['alert_email'] : '';
+        $selected = isset($options['alert_email_min_severity']) ? (string) $options['alert_email_min_severity'] : 'warning';
 
         printf(
             '<input type="email" name="%1$s[alert_email]" value="%2$s" class="regular-text" placeholder="ops@example.com" />',
@@ -574,12 +596,38 @@ final class SettingsPage
             esc_attr($value)
         );
         echo '<p class="description">' . esc_html__('Email address that should receive critical alerts.', 'axs4all-ai') . '</p>';
+        $this->renderSeveritySelect('alert_email_min_severity', $selected, __('Send email when alerts meet or exceed this severity.', 'axs4all-ai'));
+    }
+
+    private function renderSeveritySelect(string $field, string $selected, string $description = ''): void
+    {
+        $options = [
+            'info' => __('Info', 'axs4all-ai'),
+            'warning' => __('Warning', 'axs4all-ai'),
+            'critical' => __('Critical', 'axs4all-ai'),
+        ];
+
+        echo '<p><label>' . esc_html__('Minimum severity:', 'axs4all-ai') . ' ';
+        echo '<select name="' . esc_attr(self::OPTION_NAME . '[' . $field . ']') . '">';
+        foreach ($options as $value => $label) {
+            printf(
+                '<option value="%1$s" %2$s>%3$s</option>',
+                esc_attr($value),
+                selected($selected, $value, false),
+                esc_html($label)
+            );
+        }
+        echo '</select></label></p>';
+        if ($description !== '') {
+            echo '<p class="description">' . esc_html($description) . '</p>';
+        }
     }
 
     public function renderAlertSlackField(): void
     {
         $options = get_option(self::OPTION_NAME, []);
         $value = isset($options['alert_slack_webhook']) ? (string) $options['alert_slack_webhook'] : '';
+        $selected = isset($options['alert_slack_min_severity']) ? (string) $options['alert_slack_min_severity'] : 'warning';
 
         printf(
             '<input type="url" name="%1$s[alert_slack_webhook]" value="%2$s" class="regular-text" placeholder="https://hooks.slack.com/..." />',
@@ -587,6 +635,7 @@ final class SettingsPage
             esc_attr($value)
         );
         echo '<p class="description">' . esc_html__('Optional Slack Incoming Webhook URL for alerts.', 'axs4all-ai') . '</p>';
+        $this->renderSeveritySelect('alert_slack_min_severity', $selected, __('Send Slack notifications when alerts meet or exceed this severity.', 'axs4all-ai'));
     }
 
     public function renderAlertQueueThresholdField(): void
@@ -600,5 +649,20 @@ final class SettingsPage
             esc_attr((string) $value)
         );
         echo '<p class="description">' . esc_html__('Trigger alerts when pending jobs meet or exceed this number.', 'axs4all-ai') . '</p>';
+    }
+
+    public function renderAlertTicketField(): void
+    {
+        $options = get_option(self::OPTION_NAME, []);
+        $value = isset($options['alert_ticket_webhook']) ? (string) $options['alert_ticket_webhook'] : '';
+        $selected = isset($options['alert_ticket_min_severity']) ? (string) $options['alert_ticket_min_severity'] : 'critical';
+
+        printf(
+            '<input type="url" name="%1$s[alert_ticket_webhook]" value="%2$s" class="regular-text" placeholder="https://tickets.example/api" />',
+            esc_attr(self::OPTION_NAME),
+            esc_attr($value)
+        );
+        echo '<p class="description">' . esc_html__('Optional webhook that opens tickets or notifies the on-call rota.', 'axs4all-ai') . '</p>';
+        $this->renderSeveritySelect('alert_ticket_min_severity', $selected, __('Open tickets/on-call notifications when alerts meet or exceed this severity.', 'axs4all-ai'));
     }
 }

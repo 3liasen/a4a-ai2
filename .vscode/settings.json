@@ -1,6 +1,8 @@
 {
   "phpunit.args": [
     "--bootstrap",
-    "${workspaceFolder}\\tests\\bootstrap.php"
-  ]
+    "${workspaceFolder}/tests/bootstrap.php"
+  ],
+  "php.validate.enable": true,
+  "php.validate.executablePath": "c:/php/php.exe"
 }

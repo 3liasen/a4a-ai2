@@ -32,6 +32,7 @@ final class AlertManagerTest extends TestCase
     {
         update_option('axs4all_ai_settings', [
             'alert_email' => 'ops@example.com',
+            'alert_email_min_severity' => 'warning',
             'alert_queue_threshold' => 5,
         ]);
 
@@ -40,6 +41,32 @@ final class AlertManagerTest extends TestCase
         self::assertNotEmpty($GLOBALS['wp_mails']);
         $mail = $GLOBALS['wp_mails'][0];
         self::assertStringContainsString('queue_crawl', $mail['subject']);
+    }
+
+    public function testSeverityMinimumPreventsLowerAlerts(): void
+    {
+        update_option('axs4all_ai_settings', [
+            'alert_email' => 'ops@example.com',
+            'alert_email_min_severity' => 'critical',
+            'alert_queue_threshold' => 5,
+        ]);
+
+        $this->manager->recordQueueMetrics('crawl', 5);
+
+        self::assertEmpty($GLOBALS['wp_mails']);
+    }
+
+    public function testTicketWebhookCreatesAlertState(): void
+    {
+        update_option('axs4all_ai_settings', [
+            'alert_ticket_webhook' => 'https://ticket.example/ingest',
+            'alert_ticket_min_severity' => 'warning',
+        ]);
+
+        $this->manager->ensureCronScheduled('nonexistent_hook', 'classification');
+
+        $state = get_option('axs4all_ai_alert_state', []);
+        self::assertArrayHasKey('cron_classification', $state);
     }
 
     private AlertManager $manager;
