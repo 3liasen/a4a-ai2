@@ -30,6 +30,7 @@ use Axs4allAi\Data\QueueRepository;
 use Axs4allAi\Data\SnapshotRepository;
 use Axs4allAi\Infrastructure\Installer;
 use Axs4allAi\Infrastructure\ExchangeRateUpdater;
+use Axs4allAi\Infrastructure\DebugLogger;
 
 final class Plugin
 {
@@ -47,6 +48,7 @@ final class Plugin
     private ClientRepository $clientRepository;
     private SnapshotRepository $snapshotRepository;
     private ExchangeRateUpdater $exchangeRateUpdater;
+    private DebugLogger $debugLogger;
     private array $settings;
     private string $version;
     public function __construct()
@@ -62,6 +64,7 @@ final class Plugin
         $this->clientRepository = new ClientRepository($wpdb);
         $this->snapshotRepository = new SnapshotRepository($wpdb);
         $this->exchangeRateUpdater = new ExchangeRateUpdater();
+        $this->debugLogger = new DebugLogger();
         $this->settings = $this->loadSettings();
         $apiKey = $this->resolveApiKey();
         $this->aiClient = new OpenAiClient(
@@ -92,7 +95,8 @@ final class Plugin
             $this->categoryRepository,
             null,
             null,
-            $this->snapshotRepository
+            $this->snapshotRepository,
+            $this->debugLogger
         );
         $this->crawlScheduler = new CrawlScheduler($this->queueRepository, $this->crawlRunner);
         $this->clientCrawlScheduler = new ClientCrawlScheduler(
@@ -126,7 +130,7 @@ final class Plugin
     {
         $settings = new SettingsPage();
         $queuePage = new QueuePage($this->queueRepository, $this->clientRepository, $this->categoryRepository);
-        $debugPage = new DebugPage($this->snapshotRepository);
+        $debugPage = new DebugPage($this->snapshotRepository, $this->debugLogger);
         $promptPage = new PromptPage($this->promptRepository, $this->categoryRepository);
         $manualPage = new ManualClassificationPage(
             $this->classificationQueueRepository,

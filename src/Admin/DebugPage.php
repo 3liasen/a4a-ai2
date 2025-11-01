@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Axs4allAi\Admin;
 
 use Axs4allAi\Data\SnapshotRepository;
+use Axs4allAi\Infrastructure\DebugLogger;
 
 final class DebugPage
 {
@@ -12,12 +13,15 @@ final class DebugPage
     private const CLEAR_ACTION = 'axs4all_ai_clear_log';
     private const DOWNLOAD_ACTION = 'axs4all_ai_download_log';
     private const NONCE_ACTION = 'axs4all_ai_debug_log_action';
+    private const CLEAR_EVENTS_ACTION = 'axs4all_ai_clear_debug_events';
 
     private ?SnapshotRepository $snapshots;
+    private ?DebugLogger $logger;
 
-    public function __construct(?SnapshotRepository $snapshots = null)
+    public function __construct(?SnapshotRepository $snapshots = null, ?DebugLogger $logger = null)
     {
         $this->snapshots = $snapshots;
+        $this->logger = $logger;
     }
 
     public function registerMenu(): void
@@ -36,6 +40,7 @@ final class DebugPage
     {
         add_action('admin_post_' . self::CLEAR_ACTION, [$this, 'handleClear']);
         add_action('admin_post_' . self::DOWNLOAD_ACTION, [$this, 'handleDownload']);
+        add_action('admin_post_' . self::CLEAR_EVENTS_ACTION, [$this, 'handleClearEvents']);
     }
 
     public function render(): void
@@ -58,6 +63,7 @@ final class DebugPage
             $snapshotDetail = $this->snapshots->find($viewSnapshotId);
         }
         $recentSnapshots = $this->snapshots instanceof SnapshotRepository ? $this->snapshots->latest(10) : [];
+        $events = $this->logger instanceof DebugLogger ? $this->logger->all(50) : [];
 
         ?>
         <div class="wrap">
@@ -102,6 +108,59 @@ final class DebugPage
                     ?>
                 </p>
                 <textarea readonly rows="20" style="width:100%; font-family: Menlo, Consolas, monospace;"><?php echo esc_textarea(implode("\n", $preview['lines'])); ?></textarea>
+            <?php endif; ?>
+
+            <?php if ($this->logger instanceof DebugLogger) : ?>
+                <hr>
+                <h2><?php esc_html_e('Crawler Events', 'axs4all-ai'); ?></h2>
+                <p class="description">
+                    <?php esc_html_e('Recent events recorded from the crawler and extractor to help diagnose queue behaviour.', 'axs4all-ai'); ?>
+                </p>
+
+                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom: 0.75rem;">
+                    <?php wp_nonce_field(self::NONCE_ACTION); ?>
+                    <input type="hidden" name="action" value="<?php echo esc_attr(self::CLEAR_EVENTS_ACTION); ?>">
+                    <button type="submit" class="button button-secondary" onclick="return confirm('<?php echo esc_js(__('Clear stored crawler events?', 'axs4all-ai')); ?>');">
+                        <?php esc_html_e('Clear Events', 'axs4all-ai'); ?>
+                    </button>
+                </form>
+
+                <?php if (empty($events)) : ?>
+                    <p><?php esc_html_e('No crawler events recorded yet.', 'axs4all-ai'); ?></p>
+                <?php else : ?>
+                    <table class="widefat striped">
+                        <thead>
+                            <tr>
+                                <th><?php esc_html_e('Time', 'axs4all-ai'); ?></th>
+                                <th><?php esc_html_e('Type', 'axs4all-ai'); ?></th>
+                                <th><?php esc_html_e('Message', 'axs4all-ai'); ?></th>
+                                <th><?php esc_html_e('Context', 'axs4all-ai'); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($events as $event) : ?>
+                                <tr>
+                                    <td><?php echo esc_html((string) ($event['timestamp'] ?? '')); ?></td>
+                                    <td><code><?php echo esc_html((string) ($event['type'] ?? '')); ?></code></td>
+                                    <td><?php echo esc_html((string) ($event['message'] ?? '')); ?></td>
+                                    <td style="max-width: 260px; word-break: break-word;">
+                                        <?php
+                                        $context = $event['context'] ?? [];
+                                        if (empty($context) || ! is_array($context)) {
+                                            esc_html_e('—', 'axs4all-ai');
+                                        } else {
+                                            $encoded = function_exists('wp_json_encode')
+                                                ? wp_json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                                                : json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                                            echo '<code>' . esc_html((string) $encoded) . '</code>';
+                                        }
+                                        ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
             <?php endif; ?>
 
             <?php if ($this->snapshots instanceof SnapshotRepository) : ?>
@@ -244,6 +303,21 @@ final class DebugPage
 
         fclose($handle);
         exit;
+    }
+
+    public function handleClearEvents(): void
+    {
+        $authorized = $this->ensureAuthorized();
+        if ($authorized instanceof \WP_Error) {
+            wp_die($authorized);
+        }
+
+        if (! $this->logger instanceof DebugLogger) {
+            $this->redirectWithMessage('debug_log_error', __('Crawler events are not available.', 'axs4all-ai'));
+        }
+
+        $this->logger->clear();
+        $this->redirectWithMessage('debug_log_message', __('Crawler events cleared.', 'axs4all-ai'));
     }
 
     private function resolveLogPath(): ?string

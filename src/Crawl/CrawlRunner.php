@@ -11,6 +11,7 @@ use Axs4allAi\Data\ClientRepository;
 use Axs4allAi\Data\QueueRepository;
 use Axs4allAi\Data\SnapshotRepository;
 use Axs4allAi\Extraction\Extractor;
+use Axs4allAi\Infrastructure\DebugLogger;
 
 final class CrawlRunner
 {
@@ -22,6 +23,7 @@ final class CrawlRunner
     private Scraper $scraper;
     private Extractor $extractor;
     private ?SnapshotRepository $snapshots;
+    private ?DebugLogger $logger;
     /** @var array<string, bool> */
     private array $seenHashes = [];
     /** @var array<string, bool> */
@@ -35,7 +37,8 @@ final class CrawlRunner
         ?CategoryRepository $categories = null,
         ?Scraper $scraper = null,
         ?Extractor $extractor = null,
-        ?SnapshotRepository $snapshots = null
+        ?SnapshotRepository $snapshots = null,
+        ?DebugLogger $logger = null
     ) {
         $this->repository = $repository;
         $this->promptRepository = $promptRepository;
@@ -45,6 +48,7 @@ final class CrawlRunner
         $this->scraper = $scraper ?? new Scraper();
         $this->extractor = $extractor ?? new Extractor();
         $this->snapshots = $snapshots;
+        $this->logger = $logger;
     }
 
     public function run(int $batchSize = 5): void
@@ -54,6 +58,7 @@ final class CrawlRunner
 
         $pendingCount = $this->repository->countPending();
         error_log(sprintf('[axs4all-ai] Crawl runner starting. Pending items: %d.', $pendingCount));
+        $this->log('crawl_start', sprintf('Crawl runner starting (%d pending)', $pendingCount), ['pending' => $pendingCount]);
 
         $items = $this->repository->getPending($batchSize);
         foreach ($items as $item) {
@@ -69,6 +74,13 @@ final class CrawlRunner
             }
 
             error_log(sprintf('[axs4all-ai] Processing queue item #%d (%s).', $queueId, $rootUrl));
+            $this->log('queue_item', sprintf('Processing queue item #%d', $queueId), [
+                'queue_id' => $queueId,
+                'url' => $rootUrl,
+                'category' => $category,
+                'client_id' => $queueClientId,
+                'crawl_subpages' => $crawlSubpages,
+            ]);
 
             $client = $this->resolveClient($queueClientId, $rootUrl);
             $clientId = $client !== null && isset($client['id']) ? (int) $client['id'] : ($queueClientId > 0 ? $queueClientId : null);
@@ -76,16 +88,19 @@ final class CrawlRunner
             $pages = $this->collectPages($queueId, $rootUrl, $crawlSubpages);
             if (empty($pages)) {
                 error_log(sprintf('[axs4all-ai] No pages fetched for queue item #%d.', $queueId));
+                $this->log('crawl_warning', 'No pages fetched', ['queue_id' => $queueId, 'url' => $rootUrl]);
                 continue;
             }
 
             if ($this->classificationQueue === null) {
+                $this->log('crawl_warning', 'Classification queue repository missing', ['queue_id' => $queueId]);
                 continue;
             }
 
             $assignments = $this->determineCategoryAssignments($category, $client, $queueCategoryId);
             if (empty($assignments)) {
                 error_log(sprintf('[axs4all-ai] No categories resolved for queue item #%d. Skipping classification.', $queueId));
+                $this->log('crawl_warning', 'No categories resolved', ['queue_id' => $queueId]);
                 continue;
             }
 
@@ -98,8 +113,19 @@ final class CrawlRunner
                     $categoryId = isset($assignment['id']) ? (int) $assignment['id'] : null;
                     $categoryMeta = $assignment['meta'];
 
+                    $this->log('extract_start', 'Extracting snippets', [
+                        'queue_id' => $queueId,
+                        'category' => $categoryName,
+                        'page' => $pageUrl,
+                    ]);
+
                     $snippets = $this->extractor->extract($html, $categoryName, $categoryMeta);
                     if (empty($snippets)) {
+                        $this->log('extract_empty', 'No snippets extracted', [
+                            'queue_id' => $queueId,
+                            'category' => $categoryName,
+                            'page' => $pageUrl,
+                        ]);
                         continue;
                     }
 
@@ -136,6 +162,13 @@ final class CrawlRunner
                                     $index + 1
                                 )
                             );
+                            $this->log('enqueue_success', 'Classification job enqueued', [
+                                'queue_id' => $queueId,
+                                'job_id' => $jobId,
+                                'category' => $categoryName,
+                                'page' => $pageUrl,
+                                'snippet_index' => $index + 1,
+                            ]);
                         } else {
                             error_log(
                                 sprintf(
@@ -145,6 +178,12 @@ final class CrawlRunner
                                     $index + 1
                                 )
                             );
+                            $this->log('enqueue_error', 'Failed to enqueue classification job', [
+                                'queue_id' => $queueId,
+                                'category' => $categoryName,
+                                'page' => $pageUrl,
+                                'snippet_index' => $index + 1,
+                            ]);
                         }
                     }
                 }
@@ -152,6 +191,7 @@ final class CrawlRunner
         }
 
         error_log('[axs4all-ai] Crawl runner finished.');
+        $this->log('crawl_finished', 'Crawl runner finished');
     }
 
     /** @param array<string, mixed>|null $client */
@@ -364,17 +404,25 @@ final class CrawlRunner
         }
 
         if (isset($this->seenUrls[$normalisedUrl])) {
+            $this->log('page_skip', 'URL already processed in this run', [
+                'url' => $url,
+            ]);
             return null;
         }
 
         $html = $this->scraper->fetch($url);
         if ($html === null) {
+            $this->log('page_error', 'Failed to fetch page', ['url' => $url]);
             return null;
         }
 
         $hash = hash('sha256', $html);
         if (isset($this->seenHashes[$hash])) {
             error_log(sprintf('[axs4all-ai] Skipping duplicate content at %s.', $url));
+            $this->log('page_skip', 'Duplicate content hash encountered', [
+                'url' => $url,
+                'hash' => $hash,
+            ]);
             return null;
         }
 
@@ -384,6 +432,12 @@ final class CrawlRunner
         if ($this->snapshots instanceof SnapshotRepository) {
             $this->snapshots->store($queueId, $hash, $html);
         }
+
+        $this->log('page_captured', 'Page captured and snapshot stored', [
+            'url' => $url,
+            'hash' => $hash,
+            'queue_id' => $queueId,
+        ]);
 
         return [
             'url' => $url,
@@ -476,5 +530,17 @@ final class CrawlRunner
             'keywords' => $normalise($category['keywords'] ?? []),
             'options' => $normalise($category['options'] ?? []),
         ];
+    }
+
+    /**
+     * @param array<string, scalar|null> $context
+     */
+    private function log(string $type, string $message, array $context = []): void
+    {
+        if (! $this->logger instanceof DebugLogger) {
+            return;
+        }
+
+        $this->logger->record($type, $message, $context);
     }
 }
