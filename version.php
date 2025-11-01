@@ -5,5 +5,4 @@
 
 declare(strict_types=1);
 
-return '0.0.21';
-
+return '0.0.22';

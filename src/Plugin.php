@@ -27,6 +27,7 @@ use Axs4allAi\Crawl\CrawlRunner;
 use Axs4allAi\Crawl\CrawlScheduler;
 use Axs4allAi\Data\ClientRepository;
 use Axs4allAi\Data\QueueRepository;
+use Axs4allAi\Data\SnapshotRepository;
 use Axs4allAi\Infrastructure\Installer;
 use Axs4allAi\Infrastructure\ExchangeRateUpdater;
 
@@ -44,6 +45,7 @@ final class Plugin
     private ClientCrawlScheduler $clientCrawlScheduler;
     private CrawlRunner $crawlRunner;
     private ClientRepository $clientRepository;
+    private SnapshotRepository $snapshotRepository;
     private ExchangeRateUpdater $exchangeRateUpdater;
     private array $settings;
     private string $version;
@@ -58,6 +60,7 @@ final class Plugin
         $this->categoryRepository = new CategoryRepository();
         $this->classificationQueueRepository = new ClassificationQueueRepository($wpdb);
         $this->clientRepository = new ClientRepository($wpdb);
+        $this->snapshotRepository = new SnapshotRepository($wpdb);
         $this->exchangeRateUpdater = new ExchangeRateUpdater();
         $this->settings = $this->loadSettings();
         $apiKey = $this->resolveApiKey();
@@ -86,7 +89,10 @@ final class Plugin
             $this->promptRepository,
             $this->classificationQueueRepository,
             $this->clientRepository,
-            $this->categoryRepository
+            $this->categoryRepository,
+            null,
+            null,
+            $this->snapshotRepository
         );
         $this->crawlScheduler = new CrawlScheduler($this->queueRepository, $this->crawlRunner);
         $this->clientCrawlScheduler = new ClientCrawlScheduler(
