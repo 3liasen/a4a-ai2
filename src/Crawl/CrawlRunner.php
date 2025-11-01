@@ -46,7 +46,7 @@ final class CrawlRunner
         $this->clients = $clients;
         $this->categories = $categories;
         $this->scraper = $scraper ?? new Scraper();
-        $this->extractor = $extractor ?? new Extractor();
+        $this->extractor = $extractor ?? new Extractor($logger);
         $this->snapshots = $snapshots;
         $this->logger = $logger;
     }
@@ -529,6 +529,7 @@ final class CrawlRunner
                 'phrases' => [],
                 'keywords' => [],
                 'options' => [],
+                'snippet_limit' => null,
             ];
         }
 
@@ -536,6 +537,7 @@ final class CrawlRunner
             'phrases' => $normalise($category['phrases'] ?? []),
             'keywords' => $normalise($category['keywords'] ?? []),
             'options' => $normalise($category['options'] ?? []),
+            'snippet_limit' => isset($category['snippet_limit']) ? (int) $category['snippet_limit'] : null,
         ];
     }
 

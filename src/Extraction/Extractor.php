@@ -4,8 +4,24 @@ declare(strict_types=1);
 
 namespace Axs4allAi\Extraction;
 
+use Axs4allAi\Infrastructure\DebugLogger;
+
 final class Extractor
 {
+    private const PHRASE_WEIGHT = 6;
+    private const KEYWORD_WEIGHT = 3;
+    private const OPTION_WEIGHT = 1;
+    private const LENGTH_BONUS = 2;
+    private const LENGTH_PENALTY_SHORT = 2;
+    private const LENGTH_PENALTY_LONG = 2;
+
+    private ?DebugLogger $logger;
+
+    public function __construct(?DebugLogger $logger = null)
+    {
+        $this->logger = $logger;
+    }
+
     /**
      * @return array<int, string>
      */
@@ -33,7 +49,7 @@ final class Extractor
         $selected = [];
         $selectedMap = [];
         $hasMetadata = ! empty($metadata['phrases']) || ! empty($metadata['keywords']) || ! empty($metadata['options']);
-        $maxSnippets = $hasMetadata ? 3 : 5;
+        $snippetLimit = $this->resolveSnippetLimit($metadata, $hasMetadata);
 
         foreach ($scored as $row) {
             $text = $row['text'];
@@ -42,9 +58,48 @@ final class Extractor
                 $selected[] = $text;
                 $selectedMap[$fingerprint] = true;
             }
-            if (count($selected) >= $maxSnippets) {
+            if (count($selected) >= $snippetLimit) {
                 break;
             }
+        }
+
+        if ($this->logger instanceof DebugLogger) {
+            $topSnippets = array_slice(
+                array_map(
+                    static function (array $row): array {
+                        $preview = mb_substr($row['text'], 0, 160);
+                        if (mb_strlen($row['text']) > 160) {
+                            $preview .= '...';
+                        }
+
+                        return [
+                            'score' => $row['score'],
+                            'phrases' => $row['matches']['phrases'],
+                            'keywords' => $row['matches']['keywords'],
+                            'options' => $row['matches']['options'],
+                            'text' => $preview,
+                        ];
+                    },
+                    $scored
+                ),
+                0,
+                3
+            );
+
+            $encoded = json_encode($topSnippets, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+            $this->log(
+                'extract_debug',
+                'Extractor scoring summary',
+                [
+                    'category' => $category,
+                    'fragments' => count($fragments),
+                    'scored' => count($scored),
+                    'selected' => count($selected),
+                    'snippet_limit' => $snippetLimit,
+                    'top_snippets' => $encoded !== false ? $encoded : '',
+                ]
+            );
         }
 
         return $selected;
@@ -52,8 +107,8 @@ final class Extractor
 
     /**
      * @param array<int, string> $fragments
-     * @param array<string, array<int, string>> $metadata
-     * @return array<int, array{score:int,index:int,text:string}>
+     * @param array<string, mixed> $metadata
+     * @return array<int, array{score:int,index:int,text:string,matches:array{phrases:int,keywords:int,options:int}}>
      */
     private function scoreFragments(array $fragments, array $metadata): array
     {
@@ -61,30 +116,42 @@ final class Extractor
         foreach ($fragments as $index => $text) {
             $score = 0;
             $lower = mb_strtolower($text);
+            $phraseMatches = 0;
+            $keywordMatches = 0;
+            $optionMatches = 0;
 
             foreach ($metadata['phrases'] as $phrase) {
                 if ($phrase !== '' && mb_strpos($lower, $phrase) !== false) {
-                    $score += 5;
+                    $score += self::PHRASE_WEIGHT;
+                    $phraseMatches++;
                 }
             }
 
             foreach ($metadata['keywords'] as $keyword) {
                 if ($keyword !== '' && mb_strpos($lower, $keyword) !== false) {
-                    $score += 2;
+                    $score += self::KEYWORD_WEIGHT;
+                    $keywordMatches++;
                 }
             }
 
             foreach ($metadata['options'] as $option) {
                 if ($option !== '' && mb_strpos($lower, $option) !== false) {
-                    $score += 1;
+                    $score += self::OPTION_WEIGHT;
+                    $optionMatches++;
                 }
             }
 
             $length = mb_strlen($text);
-            if ($length >= 40 && $length <= 420) {
-                $score += 1;
-            } elseif ($length < 25) {
-                $score -= 1;
+            if ($length >= 60 && $length <= 420) {
+                $score += self::LENGTH_BONUS;
+            } elseif ($length < 40) {
+                $score -= self::LENGTH_PENALTY_SHORT;
+            } elseif ($length > 520) {
+                $score -= self::LENGTH_PENALTY_LONG;
+            }
+
+            if (($phraseMatches + $keywordMatches) >= 2) {
+                $score += 2;
             }
 
             if ($score > 0) {
@@ -92,6 +159,11 @@ final class Extractor
                     'score' => $score,
                     'index' => $index,
                     'text' => $text,
+                    'matches' => [
+                        'phrases' => $phraseMatches,
+                        'keywords' => $keywordMatches,
+                        'options' => $optionMatches,
+                    ],
                 ];
             }
         }
@@ -107,6 +179,11 @@ final class Extractor
                 'score' => 1,
                 'index' => $index,
                 'text' => $text,
+                'matches' => [
+                    'phrases' => 0,
+                    'keywords' => 0,
+                    'options' => 0,
+                ],
             ];
             if (count($fallback) >= 3) {
                 break;
@@ -165,10 +242,15 @@ final class Extractor
 
     /**
      * @param array<string, mixed> $metadata
-     * @return array<string, array<int, string>>
+     * @return array<string, mixed>
      */
     private function normaliseMetadata(array $metadata): array
     {
+        $limit = null;
+        if (isset($metadata['snippet_limit']) && is_numeric($metadata['snippet_limit'])) {
+            $limit = max(1, min(10, (int) $metadata['snippet_limit']));
+        }
+
         $extractList = static function ($key) use ($metadata): array {
             if (! isset($metadata[$key])) {
                 return [];
@@ -198,6 +280,28 @@ final class Extractor
             'phrases' => $extractList('phrases'),
             'keywords' => $extractList('keywords'),
             'options' => $extractList('options'),
+            'snippet_limit' => $limit,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $metadata
+     */
+    private function resolveSnippetLimit(array $metadata, bool $hasMetadata): int
+    {
+        if (isset($metadata['snippet_limit']) && is_int($metadata['snippet_limit']) && $metadata['snippet_limit'] > 0) {
+            return $metadata['snippet_limit'];
+        }
+
+        return $hasMetadata ? 3 : 5;
+    }
+
+    private function log(string $type, string $message, array $context = []): void
+    {
+        if (! $this->logger instanceof DebugLogger) {
+            return;
+        }
+
+        $this->logger->record($type, $message, $context);
     }
 }
