@@ -89,18 +89,21 @@ final class ClientCrawlScheduler
         $event = function_exists('wp_get_scheduled_event')
             ? wp_get_scheduled_event(self::HOOK, [$clientId])
             : null;
-        $existingSchedule = is_array($event) && isset($event['schedule']) ? (string) $event['schedule'] : (is_object($event) && isset($event->schedule) ? (string) $event->schedule : null);
+        $existingScheduleValue = $this->extractEventValue($event, 'schedule');
+        $existingSchedule = is_string($existingScheduleValue) ? $existingScheduleValue : null;
 
         if ($existingSchedule === $config['schedule'] && $event !== null) {
             return;
         }
 
         if ($event !== null) {
-            $timestamp = isset($event['timestamp'])
-                ? (int) $event['timestamp']
-                : (is_object($event) && isset($event->timestamp) ? (int) $event->timestamp : wp_next_scheduled(self::HOOK, [$clientId]));
+            $timestampValue = $this->extractEventValue($event, 'timestamp');
+            $timestamp = is_numeric($timestampValue) ? (int) $timestampValue : null;
+            if ($timestamp === null) {
+                $timestamp = wp_next_scheduled(self::HOOK, [$clientId]);
+            }
             if ($timestamp) {
-                wp_unschedule_event($timestamp, self::HOOK, [$clientId]);
+                wp_unschedule_event((int) $timestamp, self::HOOK, [$clientId]);
             }
         } else {
             $timestamp = wp_next_scheduled(self::HOOK, [$clientId]);
@@ -192,5 +195,22 @@ final class ClientCrawlScheduler
         }
 
         return is_array($client) ? $client : [];
+    }
+
+    /**
+     * @param mixed $event
+     * @return mixed
+     */
+    private function extractEventValue($event, string $key)
+    {
+        if (is_array($event) && array_key_exists($key, $event)) {
+            return $event[$key];
+        }
+
+        if (is_object($event) && isset($event->$key)) {
+            return $event->$key;
+        }
+
+        return null;
     }
 }
