@@ -13,6 +13,7 @@ final class CategoryRepository
     private const META_KEYWORDS = '_axs4all_ai_category_keywords';
     private const META_PHRASES = '_axs4all_ai_category_phrases';
     private const META_DECISION_SET = '_axs4all_ai_category_decision_set';
+    private const META_SNIPPET_LIMIT = '_axs4all_ai_category_snippet_limit';
 
     /**
      * @return array<int, array{id: int, name: string, options: array<int, string>, created: string, updated: string}>
@@ -116,6 +117,8 @@ final class CategoryRepository
         update_post_meta($postId, self::META_KEYWORDS, $this->sanitizeKeywords($meta['keywords'] ?? []));
         update_post_meta($postId, self::META_PHRASES, $this->sanitizePhrases($meta['phrases'] ?? []));
         update_post_meta($postId, self::META_DECISION_SET, $this->sanitizeDecisionSet($meta['decision_set'] ?? ''));
+        $snippetLimit = $this->sanitizeSnippetLimit($meta['snippet_limit'] ?? null);
+        update_post_meta($postId, self::META_SNIPPET_LIMIT, $snippetLimit !== null ? $snippetLimit : '');
     }
 
     /**
@@ -174,6 +177,7 @@ final class CategoryRepository
             'keywords' => $this->sanitizeKeywords(get_post_meta($post->ID, self::META_KEYWORDS, true)),
             'phrases' => $this->sanitizePhrases(get_post_meta($post->ID, self::META_PHRASES, true)),
             'decision_set' => $this->sanitizeDecisionSet((string) get_post_meta($post->ID, self::META_DECISION_SET, true)),
+            'snippet_limit' => $this->sanitizeSnippetLimit(get_post_meta($post->ID, self::META_SNIPPET_LIMIT, true)),
             'created' => $post->post_date_gmt,
             'updated' => $post->post_modified_gmt,
         ];
@@ -202,6 +206,27 @@ final class CategoryRepository
         }
 
         return array_values($sanitised);
+    }
+
+    /**
+     * @param mixed $value
+     */
+    private function sanitizeSnippetLimit($value): ?int
+    {
+        if (is_array($value)) {
+            $value = reset($value);
+        }
+
+        if ($value === '' || $value === null) {
+            return null;
+        }
+
+        $int = (int) $value;
+        if ($int <= 0) {
+            return null;
+        }
+
+        return min(10, max(1, $int));
     }
 
     /**

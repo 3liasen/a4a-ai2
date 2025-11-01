@@ -29,7 +29,7 @@ final class CategoryRepositoryTest extends TestCase
     public function testCreateStoresCategoryAndOptions(): void
     {
         $repository = new CategoryRepository();
-        $id = $repository->create('Accessibility', ['Ramp', 'Accessible toilet']);
+        $id = $repository->create('Accessibility', ['Ramp', 'Accessible toilet'], ['snippet_limit' => 3]);
 
         self::assertNotNull($id);
         $post = get_post($id);
@@ -38,6 +38,7 @@ final class CategoryRepositoryTest extends TestCase
 
         $meta = get_post_meta($id, CategoryRepository::META_OPTIONS, true);
         self::assertSame(['Ramp', 'Accessible toilet'], $meta);
+        self::assertSame(3, get_post_meta($id, '_axs4all_ai_category_snippet_limit', true));
     }
 
     public function testUpdateChangesNameAndOptions(): void
@@ -73,5 +74,15 @@ final class CategoryRepositoryTest extends TestCase
         self::assertCount(2, $items);
         self::assertSame('Accessibility', $items[0]['name']);
         self::assertSame(['Ramp'], $items[0]['options']);
+        self::assertNull($items[0]['snippet_limit']);
+    }
+
+    public function testSanitizeSnippetLimitCastsValue(): void
+    {
+        $repository = new CategoryRepository();
+        $id = $repository->create('Testing', [], ['snippet_limit' => 25]);
+
+        $item = $repository->find($id);
+        self::assertSame(10, $item['snippet_limit']);
     }
 }

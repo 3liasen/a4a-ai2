@@ -205,6 +205,15 @@ final class CategoryPage
                                     </select>
                                 </td>
                             </tr>
+                            <tr>
+                                <th scope="row">
+                                    <label for="axs4all-ai-category-snippet-limit"><?php esc_html_e('Snippet Limit', 'axs4all-ai'); ?></label>
+                                </th>
+                                <td>
+                                    <input type="number" min="1" max="10" name="category_snippet_limit" id="axs4all-ai-category-snippet-limit" value="<?php echo isset($editCategory['snippet_limit']) && $editCategory['snippet_limit'] !== null ? esc_attr((string) $editCategory['snippet_limit']) : ''; ?>" class="small-text">
+                                    <p class="description"><?php esc_html_e('Maximum number of snippets sent to the AI for this category (leave blank to use defaults).', 'axs4all-ai'); ?></p>
+                                </td>
+                            </tr>
                         </table>
                         <?php submit_button($editCategory ? __('Update Category', 'axs4all-ai') : __('Create Category', 'axs4all-ai')); ?>
                         <?php if ($editCategory) : ?>
@@ -232,6 +241,8 @@ final class CategoryPage
         $keywordsRaw = isset($_POST['category_keywords']) ? (string) wp_unslash($_POST['category_keywords']) : '';
         $phrasesRaw = isset($_POST['category_phrases']) ? (string) wp_unslash($_POST['category_phrases']) : '';
         $decisionSet = isset($_POST['category_decision_set']) ? (string) wp_unslash($_POST['category_decision_set']) : 'binary';
+        $snippetLimitInput = isset($_POST['category_snippet_limit']) ? (int) $_POST['category_snippet_limit'] : 0;
+        $snippetLimit = $snippetLimitInput > 0 ? min(10, max(1, $snippetLimitInput)) : null;
 
         if ($name === '') {
             $this->redirectWithMessage('category_error', __('Category name is required.', 'axs4all-ai'));
@@ -246,6 +257,7 @@ final class CategoryPage
             'keywords' => $keywords,
             'phrases' => $phrases,
             'decision_set' => $decisionSet,
+            'snippet_limit' => $snippetLimit,
         ];
 
         if ($id > 0) {
