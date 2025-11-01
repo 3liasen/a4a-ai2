@@ -562,9 +562,7 @@ final class SettingsPage
 
         return sanitize_text_field($value);
     }
-}
-
-
+ 
     public function renderAlertEmailField(): void
     {
         $options = get_option(self::OPTION_NAME, []);
@@ -603,3 +601,4 @@ final class SettingsPage
         );
         echo '<p class="description">' . esc_html__('Trigger alerts when pending jobs meet or exceed this number.', 'axs4all-ai') . '</p>';
     }
+}
