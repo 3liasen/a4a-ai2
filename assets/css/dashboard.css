@@ -40,11 +40,30 @@
 .axs4all-settings-field {
     display: flex;
     flex-direction: column;
+    gap: 6px;
 }
 .axs4all-settings-label {
     font-weight: 600;
-    margin-bottom: 4px;
+    margin-bottom: 0;
 }
 .axs4all-settings-field .description {
     margin-top: 4px;
+}
+.axs4all-settings-field input[type="text"],
+.axs4all-settings-field input[type="password"],
+.axs4all-settings-field input[type="email"],
+.axs4all-settings-field input[type="url"],
+.axs4all-settings-field input[type="number"],
+.axs4all-settings-field input[type="search"],
+.axs4all-settings-field select,
+.axs4all-settings-field textarea {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+.axs4all-settings-field input.small-text {
+    width: 140px;
+}
+.axs4all-settings-field input.regular-text {
+    max-width: 100%;
 }
