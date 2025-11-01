@@ -25,11 +25,11 @@ final class ExchangeRateUpdater
         wp_schedule_event($timestamp, 'daily', self::HOOK);
     }
 
-    public function updateRate(): void
+    public function updateRate(bool $force = false): void
     {
         $settings = get_option('axs4all_ai_settings', []);
         $auto = isset($settings['exchange_rate_auto']) ? (bool) $settings['exchange_rate_auto'] : false;
-        if (! $auto) {
+        if (! $auto && ! $force) {
             return;
         }
 

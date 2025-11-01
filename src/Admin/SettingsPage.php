@@ -133,6 +133,11 @@ final class SettingsPage
         );
     }
 
+    public function registerActions(): void
+    {
+        add_action('admin_post_axs4all_ai_sync_exchange_rate', [$this, 'handleExchangeRateSync']);
+    }
+
     public function sanitize(array $input): array
     {
         $existing = get_option(self::OPTION_NAME, []);
@@ -202,6 +207,7 @@ final class SettingsPage
         ?>
         <div class="wrap">
             <h1><?php esc_html_e('axs4all AI Settings', 'axs4all-ai'); ?></h1>
+            <?php $this->renderExchangeRateNotice(); ?>
             <form method="post" action="options.php">
                 <?php
                 settings_fields(self::OPTION_GROUP);
@@ -320,6 +326,12 @@ final class SettingsPage
         } else {
             echo '<p class="description">' . esc_html__('Last automatic update: never', 'axs4all-ai') . '</p>';
         }
+
+        $syncUrl = wp_nonce_url(
+            admin_url('admin-post.php?action=axs4all_ai_sync_exchange_rate'),
+            'axs4all_ai_sync_exchange_rate'
+        );
+        echo '<p><a class="button" href="' . esc_url($syncUrl) . '">' . esc_html__('Sync now', 'axs4all-ai') . '</a></p>';
     }
 
     public function renderExchangeRateField(): void
@@ -348,6 +360,32 @@ final class SettingsPage
                 esc_html(sprintf(__('Rate source: %1$s. Last update: %2$s', 'axs4all-ai'), $source, $lastUpdatedFormatted)) .
                 '</p>';
         }
+    }
+
+    public function handleExchangeRateSync(): void
+    {
+        if (! current_user_can('manage_options')) {
+            wp_die(__('You are not allowed to sync exchange rates.', 'axs4all-ai'));
+        }
+
+        check_admin_referer('axs4all_ai_sync_exchange_rate');
+
+        $updater = new ExchangeRateUpdater();
+        $updater->updateRate(true);
+
+        $stored = ExchangeRateUpdater::getStoredRate();
+        $status = is_array($stored) ? 'success' : 'error';
+
+        $redirectUrl = add_query_arg(
+            [
+                'page' => 'axs4all-ai',
+                'exchange_rate_sync' => $status,
+            ],
+            admin_url('admin.php')
+        );
+
+        wp_safe_redirect($redirectUrl);
+        exit;
     }
 
     public function renderTimeoutField(): void
@@ -387,6 +425,29 @@ final class SettingsPage
             $maxAttempts
         );
         echo '<p class="description">' . esc_html__('How many times a job may be retried after failures before being marked as failed permanently.', 'axs4all-ai') . '</p>';
+    }
+
+    private function renderExchangeRateNotice(): void
+    {
+        if (empty($_GET['exchange_rate_sync'])) {
+            return;
+        }
+
+        $status = sanitize_text_field((string) $_GET['exchange_rate_sync']);
+        if ($status === '') {
+            return;
+        }
+
+        $class = $status === 'success' ? 'notice notice-success' : 'notice notice-error';
+        $message = $status === 'success'
+            ? __('Exchange rate updated successfully.', 'axs4all-ai')
+            : __('Failed to refresh the exchange rate. Please try again later.', 'axs4all-ai');
+
+        printf(
+            '<div class="%1$s"><p>%2$s</p></div>',
+            esc_attr($class),
+            esc_html($message)
+        );
     }
 
     private function resolveApiKeySource(string $submitted): string

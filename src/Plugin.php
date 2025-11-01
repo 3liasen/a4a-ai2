@@ -142,6 +142,7 @@ final class Plugin
         add_action('admin_menu', [$manualPage, 'registerMenu']);
         add_action('admin_menu', [$billingPage, 'registerMenu']);
         add_action('admin_init', [$settings, 'registerSettings']);
+        add_action('admin_init', [$settings, 'registerActions']);
         add_action('admin_init', [$queuePage, 'registerActions']);
         add_action('admin_init', [$debugPage, 'registerActions']);
         add_action('admin_init', [$promptPage, 'registerActions']);
