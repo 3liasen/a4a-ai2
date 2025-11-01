@@ -67,3 +67,23 @@
 .axs4all-settings-field input.regular-text {
     max-width: 100%;
 }
+.axs4all-slider-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.axs4all-slider {
+    width: 100%;
+}
+.axs4all-slider-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.axs4all-slider-meta .small-text {
+    width: 80px;
+}
+.axs4all-slider-output {
+    font-weight: 600;
+}

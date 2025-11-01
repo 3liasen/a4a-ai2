@@ -67,5 +67,15 @@ final class AdminAssets
             '3.2.0',
             true
         );
+
+        if ($page === 'axs4all-ai-settings') {
+            wp_enqueue_script(
+                'axs4all-ai-settings',
+                plugin_dir_url(AXS4ALL_AI_PLUGIN_FILE) . 'assets/js/settings.js',
+                [],
+                AXS4ALL_AI_VERSION,
+                true
+            );
+        }
     }
 }

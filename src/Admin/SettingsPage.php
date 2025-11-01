@@ -355,13 +355,41 @@ final class SettingsPage
     {
         $options = get_option(self::OPTION_NAME, []);
         $temperature = isset($options['temperature']) ? (float) $options['temperature'] : 0.0;
+        $temperature = max(0.0, min(2.0, $temperature));
 
-        printf(
-            '<input type="number" name="%1$s[temperature]" value="%2$s" min="0" max="2" step="0.1" />',
-            esc_attr(self::OPTION_NAME),
-            esc_attr((string) $temperature)
-        );
-        echo '<p class="description">' . esc_html__('Controls response randomness. Use 0 for deterministic outputs; higher values increase variation (max 2).', 'axs4all-ai') . '</p>';
+        $value = number_format($temperature, 1, '.', '');
+        $localizedValue = number_format_i18n($temperature, 1);
+        $inputId = 'axs4all-ai-temperature';
+        $name = self::OPTION_NAME . '[temperature]';
+        $decimalSeparator = strpos($localizedValue, ',') !== false ? ',' : '.';
+
+        ?>
+        <div class="axs4all-slider-wrapper" data-decimal="<?php echo esc_attr($decimalSeparator); ?>" data-decimals="1">
+            <input
+                type="range"
+                class="axs4all-slider"
+                min="0"
+                max="2"
+                step="0.1"
+                value="<?php echo esc_attr($value); ?>"
+                aria-labelledby="<?php echo esc_attr($inputId); ?>"
+            />
+            <div class="axs4all-slider-meta">
+                <input
+                    type="number"
+                    id="<?php echo esc_attr($inputId); ?>"
+                    name="<?php echo esc_attr($name); ?>"
+                    class="small-text axs4all-slider-value"
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    value="<?php echo esc_attr($value); ?>"
+                />
+                <span class="axs4all-slider-output"><?php echo esc_html($localizedValue); ?></span>
+            </div>
+        </div>
+        <p class="description"><?php esc_html_e('Controls response randomness. Use 0 for deterministic outputs; higher values increase variation (max 2).', 'axs4all-ai'); ?></p>
+        <?php
     }
 
     public function renderPromptPriceField(): void
