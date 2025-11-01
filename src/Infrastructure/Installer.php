@@ -178,6 +178,9 @@ final class Installer
 
         dbDelta([$queueSql, $snapshotsSql, $extractionsSql, $clientsSql, $clientUrlsSql, $clientCategoriesSql, $promptsSql, $classificationQueueSql, $classificationsSql]);
 
+        $backfill = new BackfillManager();
+        $backfill->run($wpdb);
+
         update_option(self::OPTION_KEY, self::DB_VERSION);
     }
 }

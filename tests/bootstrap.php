@@ -4,6 +4,71 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
+if (! defined('HOUR_IN_SECONDS')) {
+    define('HOUR_IN_SECONDS', 3600);
+}
+
+$GLOBALS['wp_options'] = $GLOBALS['wp_options'] ?? [];
+$GLOBALS['wp_actions'] = $GLOBALS['wp_actions'] ?? [];
+$GLOBALS['wp_cron_scheduled'] = $GLOBALS['wp_cron_scheduled'] ?? [];
+$GLOBALS['wp_remote_get_queue'] = $GLOBALS['wp_remote_get_queue'] ?? [];
+
+if (! function_exists('add_action')) {
+    function add_action(string $hook, callable $callback): void
+    {
+        $GLOBALS['wp_actions'][$hook][] = $callback;
+    }
+}
+
+if (! function_exists('do_action')) {
+    function do_action(string $hook, ...$args): void
+    {
+        foreach ($GLOBALS['wp_actions'][$hook] ?? [] as $callback) {
+            call_user_func_array($callback, $args);
+        }
+    }
+}
+
+if (! function_exists('get_option')) {
+    function get_option(string $option, $default = false)
+    {
+        return $GLOBALS['wp_options'][$option] ?? $default;
+    }
+}
+
+if (! function_exists('update_option')) {
+    function update_option(string $option, $value, $autoload = null): bool
+    {
+        $GLOBALS['wp_options'][$option] = $value;
+        return true;
+    }
+}
+
+if (! function_exists('delete_option')) {
+    function delete_option(string $option): bool
+    {
+        if (isset($GLOBALS['wp_options'][$option])) {
+            unset($GLOBALS['wp_options'][$option]);
+        }
+        return true;
+    }
+}
+
+if (! function_exists('wp_next_scheduled')) {
+    function wp_next_scheduled(string $hook)
+    {
+        return $GLOBALS['wp_cron_scheduled'][$hook] ?? false;
+    }
+}
+
+if (! function_exists('wp_schedule_event')) {
+    function wp_schedule_event(int $timestamp, string $recurrence, string $hook, array $args = []): bool
+    {
+        $GLOBALS['wp_cron_scheduled'][$hook] = $timestamp;
+        return true;
+    }
+}
+
 if (! defined('ARRAY_A')) {
     define('ARRAY_A', 'ARRAY_A');
 }
@@ -316,10 +381,34 @@ if (! function_exists('wp_remote_post')) {
     }
 }
 
+if (! function_exists('wp_remote_get')) {
+    function wp_remote_get(string $url, array $args = [])
+    {
+        $queue = $GLOBALS['wp_remote_get_queue'] ?? [];
+        $response = array_shift($queue);
+        $GLOBALS['wp_remote_get_queue'] = $queue;
+        if ($response === null) {
+            return [
+                'body' => '',
+                'response' => ['code' => 500],
+            ];
+        }
+
+        return $response;
+    }
+}
+
 if (! function_exists('wp_remote_retrieve_body')) {
     function wp_remote_retrieve_body($response)
     {
         return is_array($response) ? ($response['body'] ?? '') : '';
+    }
+}
+
+if (! function_exists('wp_remote_retrieve_response_code')) {
+    function wp_remote_retrieve_response_code($response): int
+    {
+        return is_array($response) ? (int) ($response['response']['code'] ?? 0) : 0;
     }
 }
 
