@@ -46,69 +46,66 @@ final class CrawlRunner
     public function run(int $batchSize = 5): void
     {
         $pendingCount = $this->repository->countPending();
-        error_log(sprintf('[axs4all-ai] Crawl runner stub starting. Pending items: %d.', $pendingCount));
+        error_log(sprintf('[axs4all-ai] Crawl runner starting. Pending items: %d.', $pendingCount));
 
         $items = $this->repository->getPending($batchSize);
         foreach ($items as $item) {
             $queueId = (int) $item['id'];
-            $url = (string) $item['source_url'];
+            $rootUrl = (string) $item['source_url'];
             $category = trim((string) $item['category']);
             $queueClientId = isset($item['client_id']) ? (int) $item['client_id'] : 0;
             $queueCategoryId = isset($item['category_id']) ? (int) $item['category_id'] : 0;
+            $crawlSubpages = ! empty($item['crawl_subpages']);
+
             if ($category === '') {
                 $category = 'default';
             }
 
-            error_log(sprintf('[axs4all-ai] Processing queue item #%d (%s).', $queueId, $url));
+            error_log(sprintf('[axs4all-ai] Processing queue item #%d (%s).', $queueId, $rootUrl));
 
-            $client = null;
-            if ($queueClientId > 0 && $this->clients instanceof ClientRepository) {
-                $client = $this->clients->find($queueClientId);
-            }
-            if ($client === null && $this->clients instanceof ClientRepository) {
-                $client = $this->clients->findByUrl($url);
-            }
-            $clientId = $queueClientId > 0 ? $queueClientId : null;
-            if ($client !== null && isset($client['id'])) {
-                $clientId = (int) $client['id'];
-            }
+            $client = $this->resolveClient($queueClientId, $rootUrl);
+            $clientId = $client !== null && isset($client['id']) ? (int) $client['id'] : ($queueClientId > 0 ? $queueClientId : null);
 
-            $html = $this->scraper->fetch($url);
-            if ($html === null) {
-                error_log(sprintf('[axs4all-ai] Scraper stub returned no HTML for %s.', $url));
+            $pages = $this->collectPages($rootUrl, $crawlSubpages);
+            if (empty($pages)) {
+                error_log(sprintf('[axs4all-ai] No pages fetched for queue item #%d.', $queueId));
                 continue;
             }
 
-            $snippets = $this->extractor->extract($html, $category);
-            error_log(
-                sprintf(
-                    '[axs4all-ai] Extractor stub completed for %s. Snippets count: %d.',
-                    $url,
-                    count($snippets)
-                )
-            );
+            if ($this->classificationQueue === null) {
+                continue;
+            }
 
-            if ($this->classificationQueue !== null && ! empty($snippets)) {
-                $assignments = $this->determineCategoryAssignments($category, $client, $queueCategoryId);
-                if (empty($assignments)) {
-                    error_log(sprintf('[axs4all-ai] No categories resolved for queue item #%d. Skipping classification.', $queueId));
-                    continue;
-                }
+            $assignments = $this->determineCategoryAssignments($category, $client, $queueCategoryId);
+            if (empty($assignments)) {
+                error_log(sprintf('[axs4all-ai] No categories resolved for queue item #%d. Skipping classification.', $queueId));
+                continue;
+            }
 
-                foreach ($snippets as $index => $snippet) {
-                    $snippet = trim((string) $snippet);
-                    if ($snippet === '') {
+            foreach ($pages as $page) {
+                $pageUrl = $page['url'];
+                $html = $page['html'];
+
+                foreach ($assignments as $assignment) {
+                    $categoryName = (string) $assignment['name'];
+                    $categoryId = isset($assignment['id']) ? (int) $assignment['id'] : null;
+                    $categoryMeta = $assignment['meta'];
+
+                    $snippets = $this->extractor->extract($html, $categoryName, $categoryMeta);
+                    if (empty($snippets)) {
                         continue;
                     }
 
-                    foreach ($assignments as $assignment) {
-                        $categoryName = (string) $assignment['name'];
-                        $categoryId = isset($assignment['id']) ? (int) $assignment['id'] : null;
+                    $promptVersion = 'v1';
+                    if ($this->promptRepository !== null) {
+                        $template = $this->promptRepository->getActiveTemplate($categoryName);
+                        $promptVersion = $template->version();
+                    }
 
-                        $promptVersion = 'v1';
-                        if ($this->promptRepository !== null) {
-                            $template = $this->promptRepository->getActiveTemplate($categoryName);
-                            $promptVersion = $template->version();
+                    foreach ($snippets as $index => $snippet) {
+                        $snippet = trim($snippet);
+                        if ($snippet === '') {
+                            continue;
                         }
 
                         $jobId = $this->classificationQueue->enqueue(
@@ -119,26 +116,26 @@ final class CrawlRunner
                             $snippet,
                             $clientId,
                             $categoryId,
-                            $url
+                            $pageUrl
                         );
 
                         if ($jobId !== null) {
                             error_log(
                                 sprintf(
-                                    '[axs4all-ai] Enqueued classification job #%d for queue item #%d (snippet %d, category: %s).',
+                                    '[axs4all-ai] Enqueued classification job #%d for queue item #%d (%s, snippet %d).',
                                     $jobId,
                                     $queueId,
-                                    $index + 1,
-                                    $categoryName
+                                    $pageUrl,
+                                    $index + 1
                                 )
                             );
                         } else {
                             error_log(
                                 sprintf(
-                                    '[axs4all-ai] Failed to enqueue classification job for queue item #%d (snippet %d, category: %s).',
+                                    '[axs4all-ai] Failed to enqueue classification job for queue item #%d (%s, snippet %d).',
                                     $queueId,
-                                    $index + 1,
-                                    $categoryName
+                                    $pageUrl,
+                                    $index + 1
                                 )
                             );
                         }
@@ -147,7 +144,7 @@ final class CrawlRunner
             }
         }
 
-        error_log('[axs4all-ai] Crawl runner stub finished.');
+        error_log('[axs4all-ai] Crawl runner finished.');
     }
 
     /** @param array<string, mixed>|null $client */
@@ -262,3 +259,6 @@ final class CrawlRunner
         }
     }
 }
+
+
+
