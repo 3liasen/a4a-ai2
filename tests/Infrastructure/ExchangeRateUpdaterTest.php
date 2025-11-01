@@ -39,13 +39,13 @@ final class ExchangeRateUpdaterTest extends TestCase
         update_option('axs4all_ai_settings', [
             'exchange_rate_auto' => 1,
             'exchange_rate' => 0.0,
+            'exchange_rate_api_key' => 'demo-key',
         ]);
 
         $GLOBALS['wp_remote_get_queue'][] = [
             'response' => ['code' => 200],
             'body' => json_encode([
-                'success' => true,
-                'rates' => ['DKK' => 6.75],
+                'data' => ['DKK' => 6.75],
             ]),
         ];
 
@@ -68,6 +68,7 @@ final class ExchangeRateUpdaterTest extends TestCase
         update_option('axs4all_ai_settings', [
             'exchange_rate_auto' => 1,
             'exchange_rate' => 0.0,
+            'exchange_rate_api_key' => 'demo-key',
         ]);
 
         $GLOBALS['wp_remote_get_queue'][] = [
@@ -77,7 +78,7 @@ final class ExchangeRateUpdaterTest extends TestCase
 
         $updater = new ExchangeRateUpdater();
         self::assertFalse($updater->updateRate());
-        self::assertSame('Unexpected response code: 500', $updater->getLastError());
+        self::assertSame('FreeCurrencyAPI responded with HTTP 500.', $updater->getLastError());
 
         $GLOBALS['wp_remote_get_queue'][] = [
             'response' => ['code' => 200],
@@ -85,7 +86,20 @@ final class ExchangeRateUpdaterTest extends TestCase
         ];
 
         self::assertFalse($updater->updateRate(true));
-        self::assertStringContainsString('Malformed response from exchangerate.host.', $updater->getLastError());
+        self::assertStringContainsString('Malformed response from FreeCurrencyAPI.', $updater->getLastError());
         self::assertNotNull($updater->getLastResponse());
+    }
+
+    public function testUpdateRateFailsWhenKeyMissing(): void
+    {
+        update_option('axs4all_ai_settings', [
+            'exchange_rate_auto' => 1,
+            'exchange_rate' => 0.0,
+            'exchange_rate_api_key' => '',
+        ]);
+
+        $updater = new ExchangeRateUpdater();
+        self::assertFalse($updater->updateRate());
+        self::assertSame('FreeCurrencyAPI access key is required before syncing.', $updater->getLastError());
     }
 }

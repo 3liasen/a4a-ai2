@@ -126,7 +126,7 @@ final class SettingsPage
 
         add_settings_field(
             'axs4all_ai_exchange_rate_api_key',
-            __('exchangerate.host API key', 'axs4all-ai'),
+            __('FreeCurrencyAPI key', 'axs4all-ai'),
             [$this, 'renderExchangeRateApiKeyField'],
             'axs4all-ai',
             'axs4all_ai_classification_section'
@@ -329,7 +329,7 @@ final class SettingsPage
             '<label><input type="checkbox" name="%1$s[exchange_rate_auto]" value="1" %2$s> %3$s</label>',
             esc_attr(self::OPTION_NAME),
             checked($auto, true, false),
-            esc_html__('Automatically fetch USD to DKK rate daily (via exchangerate.host).', 'axs4all-ai')
+            esc_html__('Automatically fetch USD to DKK rate daily (via FreeCurrencyAPI).', 'axs4all-ai')
         );
 
         if ($lastUpdatedFormatted !== '') {
@@ -357,7 +357,7 @@ final class SettingsPage
             esc_attr(self::OPTION_NAME),
             esc_attr($value)
         );
-        echo '<p class="description">' . esc_html__('Optional access key if your exchangerate.host endpoint requires authentication. Leave blank to use unauthenticated requests.', 'axs4all-ai') . '</p>';
+        echo '<p class="description">' . esc_html__('Required access key from freecurrencyapi.com. Stored locally and used for daily syncs.', 'axs4all-ai') . '</p>';
     }
 
     public function renderExchangeRateField(): void

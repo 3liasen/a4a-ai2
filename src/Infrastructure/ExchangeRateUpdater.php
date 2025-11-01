@@ -8,6 +8,9 @@ final class ExchangeRateUpdater
 {
     private const OPTION_KEY = 'axs4all_ai_exchange_rate';
     private const HOOK = 'axs4all_ai_update_exchange_rate';
+    private const API_ENDPOINT = 'https://api.freecurrencyapi.com/v1/latest';
+    private const BASE_CURRENCY = 'USD';
+    private const TARGET_CURRENCY = 'DKK';
     private ?string $lastError = null;
     private ?string $lastResponse = null;
 
@@ -42,15 +45,18 @@ final class ExchangeRateUpdater
             ? (string) $settings['exchange_rate_api_key']
             : '';
 
-        $query = [
-            'base' => 'USD',
-            'symbols' => 'DKK',
-        ];
-        if ($apiKey !== '') {
-            $query['access_key'] = $apiKey;
+        if ($apiKey === '') {
+            $this->lastError = __('FreeCurrencyAPI access key is required before syncing.', 'axs4all-ai');
+            return false;
         }
 
-        $url = 'https://api.exchangerate.host/latest?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+        $query = [
+            'apikey' => $apiKey,
+            'base_currency' => self::BASE_CURRENCY,
+            'currencies' => self::TARGET_CURRENCY,
+        ];
+
+        $url = self::API_ENDPOINT . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
 
         $response = wp_remote_get($url, [
             'timeout' => 10,
@@ -69,7 +75,7 @@ final class ExchangeRateUpdater
         if ($code !== 200) {
             $this->lastError = sprintf(
                 /* translators: %d: HTTP status code */
-                __('Unexpected response code: %d', 'axs4all-ai'),
+                __('FreeCurrencyAPI responded with HTTP %d.', 'axs4all-ai'),
                 $code
             );
             return false;
@@ -80,17 +86,17 @@ final class ExchangeRateUpdater
         $this->lastResponse = is_string($body) ? $body : '';
 
         $rate = null;
-        if (is_array($data) && isset($data['rates']['DKK'])) {
-            $rate = (float) $data['rates']['DKK'];
+        if (is_array($data) && isset($data['data'][self::TARGET_CURRENCY])) {
+            $rate = (float) $data['data'][self::TARGET_CURRENCY];
         }
 
         if (! is_array($data) || $rate === null) {
             if (isset($data['error'])) {
-                $errorInfo = is_array($data['error']) ? ($data['error']['info'] ?? $data['error']['type'] ?? '') : '';
+                $errorInfo = is_array($data['error']) ? ($data['error']['message'] ?? $data['error']['type'] ?? '') : '';
                 if ($errorInfo !== '') {
                     $this->lastError = sprintf(
                         /* translators: %s: provider error message */
-                        __('exchangerate.host error: %s', 'axs4all-ai'),
+                        __('FreeCurrencyAPI error: %s', 'axs4all-ai'),
                         $errorInfo
                     );
                 }
@@ -100,7 +106,7 @@ final class ExchangeRateUpdater
                 $snippet = $this->summarizeResponse($this->lastResponse);
                 $this->lastError = sprintf(
                     /* translators: %s: truncated response payload */
-                    __('Malformed response from exchangerate.host. Payload: %s', 'axs4all-ai'),
+                    __('Malformed response from FreeCurrencyAPI. Payload: %s', 'axs4all-ai'),
                     $snippet
                 );
             }
