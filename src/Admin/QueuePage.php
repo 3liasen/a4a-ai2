@@ -221,6 +221,9 @@ final class QueuePage
                                             <span><?php esc_html_e('No categories selected', 'axs4all-ai'); ?></span>
                                         <?php endif; ?>
                                     <?php endif; ?>
+                                    <?php if (! empty($row['crawl_subpages'])) : ?>
+                                        <input type="hidden" name="queue_crawl_subpages" value="1">
+                                    <?php endif; ?>
                                     <button type="submit" class="button"><?php esc_html_e('Queue URL', 'axs4all-ai'); ?></button>
                                 </form>
                             </td>
@@ -485,3 +488,4 @@ final class QueuePage
         return $slug !== '' ? $slug : 'default';
     }
 }
+
