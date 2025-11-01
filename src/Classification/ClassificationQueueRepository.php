@@ -288,6 +288,39 @@ final class ClassificationQueueRepository
         return (int) $count;
     }
 
+    public function countQueue(string $status = self::STATUS_PENDING): int
+    {
+        $sql = $this->wpdb->prepare(
+            "SELECT COUNT(*) FROM {$this->queueTable} WHERE status = %s",
+            $status
+        );
+
+        return (int) $this->wpdb->get_var($sql);
+    }
+
+    public function requeue(int $id): bool
+    {
+        if ($id <= 0) {
+            return false;
+        }
+
+        $updated = $this->wpdb->update(
+            $this->queueTable,
+            [
+                'status' => self::STATUS_PENDING,
+                'attempts' => 0,
+                'locked_at' => null,
+                'last_error' => '',
+                'updated_at' => current_time('mysql'),
+            ],
+            ['id' => $id],
+            ['%s', '%d', '%s', '%s', '%s'],
+            ['%d']
+        );
+
+        return $updated !== false;
+    }
+
     /**
      * @param array<string,mixed> $filters
      * @return array<string,int>

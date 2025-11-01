@@ -61,6 +61,7 @@ final class ClassificationScheduler
     public function processCron(): void
     {
         $this->runBatch($this->defaultBatchSize);
+        update_option('axs4all_ai_last_classification', current_time('mysql', true));
     }
 
     /**
@@ -84,6 +85,8 @@ final class ClassificationScheduler
                 \WP_CLI::success(sprintf('Processed %d classification job(s).', $totalProcessed));
             }
         }
+
+        update_option('axs4all_ai_last_classification', current_time('mysql', true));
     }
 
     private function runBatch(?int $batchSize = null): int

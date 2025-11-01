@@ -29,11 +29,19 @@ final class ClassificationResultsPage
         );
     }
 
+    public function registerActions(): void
+    {
+        add_action('admin_post_axs4all_ai_requeue_classification', [$this, 'handleRequeue']);
+    }
+
     public function render(): void
     {
         if (! current_user_can('manage_options')) {
             return;
         }
+
+        $message = isset($_GET['message']) ? sanitize_text_field((string) $_GET['message']) : null;
+        $cronStatus = $this->gatherCronStatus();
 
         $request = wp_unslash($_GET);
 
@@ -98,6 +106,20 @@ final class ClassificationResultsPage
         <div class="wrap">
             <h1><?php esc_html_e('Classification Results', 'axs4all-ai'); ?></h1>
             <p><?php esc_html_e('Filter, inspect, and export AI classification decisions processed by the automation pipeline.', 'axs4all-ai'); ?></p>
+
+            <?php $this->renderNotice($message, ! empty($cronStatus['next_missing'])); ?>
+
+            <div class="card" style="max-width:480px;margin-bottom:1.5rem;">
+                <h2><?php esc_html_e('Classification Scheduler', 'axs4all-ai'); ?></h2>
+                <p>
+                    <strong><?php esc_html_e('Next run:', 'axs4all-ai'); ?></strong>
+                    <?php echo esc_html($cronStatus['next'] ?? __('Not scheduled', 'axs4all-ai')); ?><br>
+                    <strong><?php esc_html_e('Last completed run:', 'axs4all-ai'); ?></strong>
+                    <?php echo esc_html($cronStatus['last'] ?? __('Never', 'axs4all-ai')); ?><br>
+                    <strong><?php esc_html_e('Pending jobs:', 'axs4all-ai'); ?></strong>
+                    <?php echo esc_html((string) ($cronStatus['pending'] ?? 0)); ?>
+                </p>
+            </div>
 
             <form method="get" class="axs4all-ai-classification-filters" style="margin-bottom: 1.5rem;">
                 <input type="hidden" name="page" value="<?php echo esc_attr(self::MENU_SLUG); ?>">
@@ -229,6 +251,22 @@ final class ClassificationResultsPage
                             <td><?php echo esc_html((string) $result['created_at']); ?></td>
                             <td>
                                 <?php
+                                $queueId = isset($result['queue_id']) ? (int) $result['queue_id'] : 0;
+                                if ($queueId > 0) :
+                                    $redirectUrl = add_query_arg(
+                                        array_merge($baseArgs, ['paged' => $currentPage]),
+                                        admin_url('admin.php')
+                                    );
+                                    ?>
+                                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;margin-right:4px;">
+                                        <?php wp_nonce_field('axs4all_ai_requeue_classification_' . $queueId); ?>
+                                        <input type="hidden" name="action" value="axs4all_ai_requeue_classification">
+                                        <input type="hidden" name="queue_id" value="<?php echo esc_attr((string) $queueId); ?>">
+                                        <input type="hidden" name="redirect" value="<?php echo esc_attr($redirectUrl); ?>">
+                                        <button type="submit" class="button button-secondary"><?php esc_html_e('Requeue', 'axs4all-ai'); ?></button>
+                                    </form>
+                                <?php endif; ?>
+                                <?php
                                 $detailUrl = add_query_arg(
                                     array_merge($baseArgs, ['paged' => $currentPage, 'detail' => (int) $result['id']]),
                                     admin_url('admin.php')
@@ -272,5 +310,82 @@ final class ClassificationResultsPage
             <?php endif; ?>
         </div>
         <?php
+    }
+
+    private function renderNotice(?string $message, bool $nextMissing): void
+    {
+        if ($message === 'requeued') {
+            echo '<div class="notice notice-success"><p>' . esc_html__('Classification job requeued for processing.', 'axs4all-ai') . '</p></div>';
+        } elseif ($message === 'requeue_error') {
+            echo '<div class="notice notice-error"><p>' . esc_html__('Unable to requeue the classification job. Please try again.', 'axs4all-ai') . '</p></div>';
+        }
+
+        if ($nextMissing) {
+            echo '<div class="notice notice-warning"><p>' . esc_html__('The classification cron event is not scheduled. Ensure WP-Cron is running or re-activate the plugin.', 'axs4all-ai') . '</p></div>';
+        }
+    }
+
+    /**
+     * @return array{next:string,last:string,pending:int,next_missing:bool}
+     */
+    private function gatherCronStatus(): array
+    {
+        $nextTimestamp = wp_next_scheduled('axs4all_ai_run_classifications');
+        $nextMissing = $nextTimestamp === false;
+        $next = $nextMissing ? __('Not scheduled', 'axs4all-ai') : $this->formatTimestamp((int) $nextTimestamp);
+
+        $lastRaw = get_option('axs4all_ai_last_classification', '');
+        $last = ($lastRaw !== '' && is_string($lastRaw)) ? $this->formatUtcString($lastRaw) : __('Never', 'axs4all-ai');
+
+        return [
+            'next' => $next,
+            'last' => $last,
+            'pending' => $this->repository->countQueue(ClassificationQueueRepository::STATUS_PENDING),
+            'next_missing' => $nextMissing,
+        ];
+    }
+
+    private function formatTimestamp(int $timestamp): string
+    {
+        return gmdate('Y-m-d H:i:s', $timestamp) . ' UTC';
+    }
+
+    private function formatUtcString(string $value): string
+    {
+        $time = strtotime($value . ' UTC');
+        if ($time === false) {
+            return $value;
+        }
+
+        return $this->formatTimestamp($time);
+    }
+
+    public function handleRequeue(): void
+    {
+        if (! current_user_can('manage_options')) {
+            wp_die(__('You are not allowed to manage classification jobs.', 'axs4all-ai'));
+        }
+
+        $queueId = isset($_POST['queue_id']) ? (int) $_POST['queue_id'] : 0;
+        check_admin_referer('axs4all_ai_requeue_classification_' . $queueId);
+
+        $success = $queueId > 0 ? $this->repository->requeue($queueId) : false;
+        $message = $success ? 'requeued' : 'requeue_error';
+
+        $redirect = isset($_POST['redirect']) ? esc_url_raw((string) $_POST['redirect']) : '';
+        if ($redirect === '') {
+            $redirect = add_query_arg(
+                [
+                    'page' => self::MENU_SLUG,
+                    'message' => $message,
+                ],
+                admin_url('admin.php')
+            );
+        } else {
+            $redirect = add_query_arg('message', $message, $redirect);
+        }
+
+        wp_safe_redirect($redirect);
+        exit;
     }
 }

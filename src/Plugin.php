@@ -163,6 +163,7 @@ final class Plugin
         add_action('admin_init', [$categoryPage, 'registerActions']);
         add_action('admin_init', [$clientPage, 'registerActions']);
         add_action('admin_init', [$manualPage, 'registerActions']);
+        add_action('admin_init', [$classificationPage, 'registerActions']);
         $footer->register();
     }
 

@@ -230,4 +230,34 @@ final class ClassificationQueueRepositoryTest extends TestCase
         self::assertSame('https://example.com', $row['source_url']);
         self::assertSame('https://example.com', $row['content_url']);
     }
+
+    public function testCountQueueReturnsPendingCount(): void
+    {
+        $wpdb = new \wpdb();
+        $wpdb->getVarQueue[] = 5;
+
+        $repository = new ClassificationQueueRepository($wpdb);
+        $count = $repository->countQueue();
+
+        self::assertSame(5, $count);
+    }
+
+    public function testRequeueResetsQueueRow(): void
+    {
+        $wpdb = new \wpdb();
+
+        $repository = new ClassificationQueueRepository($wpdb);
+        $result = $repository->requeue(12);
+
+        self::assertTrue($result);
+        self::assertNotEmpty($wpdb->updateLog);
+
+        $update = $wpdb->updateLog[0];
+        self::assertSame('wp_axs4all_ai_classifications_queue', $update['table']);
+        self::assertSame('pending', $update['data']['status']);
+        self::assertSame(0, $update['data']['attempts']);
+        self::assertNull($update['data']['locked_at']);
+        self::assertSame('', $update['data']['last_error']);
+        self::assertSame(['id' => 12], $update['where']);
+    }
 }

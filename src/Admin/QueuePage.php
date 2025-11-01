@@ -69,7 +69,12 @@ final class QueuePage
         <div class="wrap">
             <h1><?php esc_html_e('Crawl Queue', 'axs4all-ai'); ?></h1>
 
-           <?php $this->renderNotice($message); ?>
+            <?php $this->renderNotice($message); ?>
+            <?php if (! empty($cronStatus['next_missing'])) : ?>
+                <div class="notice notice-warning">
+                    <p><?php esc_html_e('The crawler cron event is not scheduled. Run “Run Crawl Now” or re-activate the plugin to restore scheduling.', 'axs4all-ai'); ?></p>
+                </div>
+            <?php endif; ?>
 
             <div class="card" style="max-width:480px;margin-bottom:1.5rem;">
                 <h2><?php esc_html_e('Crawler Schedule', 'axs4all-ai'); ?></h2>
@@ -435,7 +440,8 @@ final class QueuePage
     private function gatherCronStatus(): array
     {
         $nextTimestamp = wp_next_scheduled('axs4all_ai_process_queue');
-        $next = $nextTimestamp ? $this->formatTimestamp((int) $nextTimestamp) : __('Not scheduled', 'axs4all-ai');
+        $nextMissing = $nextTimestamp === false;
+        $next = $nextMissing ? __('Not scheduled', 'axs4all-ai') : $this->formatTimestamp((int) $nextTimestamp);
 
         $lastRaw = get_option('axs4all_ai_last_crawl', '');
         if (is_string($lastRaw) && $lastRaw !== '') {
@@ -448,6 +454,7 @@ final class QueuePage
             'next' => $next,
             'last' => $last,
             'pending' => $this->repository->countPending(),
+            'next_missing' => $nextMissing,
         ];
     }
 
