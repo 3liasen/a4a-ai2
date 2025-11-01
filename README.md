@@ -2,11 +2,11 @@
 
 WordPress plugin for axs4all that automates accessibility data collection and AI-powered classification.
 
-## Features (planned)
-- Web crawling and scraping pipeline tailored to hospitality and tourism venues.
-- Deterministic AI classification with configurable prompt templates.
-- AdminLTE powered dashboard for monitoring and manual overrides.
-- Secure storage of AI provider credentials.
+## Key Features
+- Automated crawl → extract → classify pipeline with per-category prompts and snippet limits.
+- Queue & classifier dashboards with manual requeue controls and history snapshots.
+- Alerting system (email, Slack, PagerDuty or generic webhook) with severity thresholds and a 5‑minute health monitor.
+- Secure storage for AI credentials plus billing/usage reporting (token totals, USD→DKK auto-rates).
 
 ## Development
 Install dependencies:
@@ -21,3 +21,6 @@ Run tests and linting:
 composer test
 composer lint
 ```
+
+## Operations
+Operational notes for Phase 3 (alerting, monitoring, cron health) live in [`docs/PHASE3_OPERATIONS.md`](docs/PHASE3_OPERATIONS.md).
