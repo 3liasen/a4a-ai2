@@ -451,6 +451,29 @@ if (! function_exists('wp_remote_retrieve_response_code')) {
     }
 }
 
+if (! function_exists('wp_remote_retrieve_header')) {
+    function wp_remote_retrieve_header($response, string $key)
+    {
+        if (! is_array($response)) {
+            return null;
+        }
+
+        $headers = $response['headers'] ?? [];
+        if (! is_array($headers)) {
+            return null;
+        }
+
+        $lower = strtolower($key);
+        foreach ($headers as $headerKey => $value) {
+            if (strtolower((string) $headerKey) === $lower) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+}
+
 
 
 

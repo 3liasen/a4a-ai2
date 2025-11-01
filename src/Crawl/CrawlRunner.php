@@ -45,7 +45,7 @@ final class CrawlRunner
         $this->classificationQueue = $classificationQueue;
         $this->clients = $clients;
         $this->categories = $categories;
-        $this->scraper = $scraper ?? new Scraper();
+        $this->scraper = $scraper ?? new Scraper(3, 250, $logger);
         $this->extractor = $extractor ?? new Extractor($logger);
         $this->snapshots = $snapshots;
         $this->logger = $logger;
@@ -417,11 +417,18 @@ final class CrawlRunner
             return null;
         }
 
-        $html = $this->scraper->fetch($url);
-        if ($html === null) {
+        $result = $this->scraper->fetch($url);
+        if ($result === null) {
             $this->log('page_error', 'Failed to fetch page', ['url' => $url]);
             return null;
         }
+
+        if (! empty($result['disallow_index'])) {
+            $this->log('page_skip', 'Robots noindex directive encountered', ['url' => $url]);
+            return null;
+        }
+
+        $html = $result['html'];
 
         $hash = hash('sha256', $html);
         if (isset($this->seenHashes[$hash])) {

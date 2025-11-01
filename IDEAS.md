@@ -26,3 +26,7 @@ We should implement the option to use Open AI's 'Batch API' when we're up and ru
 https://platform.openai.com/docs/guides/batch
 ==
 In a dedicated Settings area, we should have the ability to turn on and off features in our plugin. We need to make sure, that turned off features doesn't collide with functionality. 
+
+== 
+We should add the option on Client level to accept or deny acceptance of robots/noindex
+==
