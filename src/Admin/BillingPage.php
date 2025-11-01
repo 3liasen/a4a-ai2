@@ -115,17 +115,17 @@ final class BillingPage
                     <tr>
                         <td><?php esc_html_e('Prompt cost', 'axs4all-ai'); ?></td>
                         <td><?php echo esc_html($this->formatMoney($promptCostUsd, '$')); ?></td>
-                        <td><?php echo esc_html($this->formatMoneyOrDash($promptCostDkk, 'kr. ')); ?></td>
+                        <td><?php echo esc_html($this->formatMoneyOrDash($promptCostDkk, 'kr. ', 4)); ?></td>
                     </tr>
                     <tr>
                         <td><?php esc_html_e('Completion cost', 'axs4all-ai'); ?></td>
                         <td><?php echo esc_html($this->formatMoney($completionCostUsd, '$')); ?></td>
-                        <td><?php echo esc_html($this->formatMoneyOrDash($completionCostDkk, 'kr. ')); ?></td>
+                        <td><?php echo esc_html($this->formatMoneyOrDash($completionCostDkk, 'kr. ', 4)); ?></td>
                     </tr>
                     <tr>
                         <th><?php esc_html_e('Total estimated cost', 'axs4all-ai'); ?></th>
                         <th><?php echo esc_html($this->formatMoney($totalCostUsd, '$')); ?></th>
-                        <th><?php echo esc_html($this->formatMoneyOrDash($totalCostDkk, 'kr. ')); ?></th>
+                        <th><?php echo esc_html($this->formatMoneyOrDash($totalCostDkk, 'kr. ', 4)); ?></th>
                     </tr>
                 </tbody>
             </table>
@@ -293,14 +293,14 @@ final class BillingPage
         return $usdCost * $exchangeRate;
     }
 
-    private function formatMoney(float $value, string $symbol): string
+    private function formatMoney(float $value, string $symbol, int $decimals = 2): string
     {
-        return $symbol . number_format($value, 2);
+        return $symbol . number_format($value, $decimals);
     }
 
-    private function formatMoneyOrDash(?float $value, string $symbol): string
+    private function formatMoneyOrDash(?float $value, string $symbol, int $decimals = 2): string
     {
-        return $value !== null ? $symbol . number_format($value, 2) : '--';
+        return $value !== null ? $symbol . number_format($value, $decimals) : '--';
     }
 
     /**
