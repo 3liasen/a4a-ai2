@@ -137,9 +137,16 @@ final class ClassificationResultsPage
                         <li><strong><?php esc_html_e('Prompt version:', 'axs4all-ai'); ?></strong> <?php echo esc_html((string) $detail['prompt_version']); ?></li>
                         <li><strong><?php esc_html_e('Queue ID:', 'axs4all-ai'); ?></strong> <?php echo esc_html((string) $detail['queue_id']); ?></li>
                         <li><strong><?php esc_html_e('Category:', 'axs4all-ai'); ?></strong> <?php echo esc_html((string) ($detail['category'] ?? '--')); ?></li>
-                        <li><strong><?php esc_html_e('Source URL:', 'axs4all-ai'); ?></strong>
+                        <li><strong><?php esc_html_e('Queue source URL:', 'axs4all-ai'); ?></strong>
                             <?php if (! empty($detail['source_url'])) : ?>
                                 <a href="<?php echo esc_url((string) $detail['source_url']); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html((string) $detail['source_url']); ?></a>
+                            <?php else : ?>
+                                <?php esc_html_e('n/a', 'axs4all-ai'); ?>
+                            <?php endif; ?>
+                        </li>
+                        <li><strong><?php esc_html_e('Snippet URL:', 'axs4all-ai'); ?></strong>
+                            <?php if (! empty($detail['content_url'])) : ?>
+                                <a href="<?php echo esc_url((string) $detail['content_url']); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html((string) $detail['content_url']); ?></a>
                             <?php else : ?>
                                 <?php esc_html_e('n/a', 'axs4all-ai'); ?>
                             <?php endif; ?>
@@ -162,7 +169,7 @@ final class ClassificationResultsPage
                     <tr>
                         <th><?php esc_html_e('Decision', 'axs4all-ai'); ?></th>
                         <th><?php esc_html_e('Queue ID', 'axs4all-ai'); ?></th>
-                        <th><?php esc_html_e('Source URL', 'axs4all-ai'); ?></th>
+                        <th><?php esc_html_e('Snippet URL', 'axs4all-ai'); ?></th>
                         <th><?php esc_html_e('Category', 'axs4all-ai'); ?></th>
                         <th><?php esc_html_e('Confidence', 'axs4all-ai'); ?></th>
                         <th><?php esc_html_e('Prompt Version', 'axs4all-ai'); ?></th>
@@ -194,8 +201,11 @@ final class ClassificationResultsPage
                             </td>
                             <td><?php echo esc_html((string) $result['queue_id']); ?></td>
                             <td>
-                                <?php if (! empty($result['source_url'])) : ?>
-                                    <a href="<?php echo esc_url((string) $result['source_url']); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(wp_trim_words((string) $result['source_url'], 6, '...')); ?></a>
+                                <?php
+                                $snippetUrl = ! empty($result['content_url']) ? (string) $result['content_url'] : ((string) ($result['source_url'] ?? ''));
+                                ?>
+                                <?php if ($snippetUrl !== '') : ?>
+                                    <a href="<?php echo esc_url($snippetUrl); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html(wp_trim_words($snippetUrl, 6, '...')); ?></a>
                                 <?php else : ?>
                                     &mdash;
                                 <?php endif; ?>

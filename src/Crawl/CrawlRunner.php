@@ -118,7 +118,8 @@ final class CrawlRunner
                             $promptVersion,
                             $snippet,
                             $clientId,
-                            $categoryId
+                            $categoryId,
+                            $url
                         );
 
                         if ($jobId !== null) {

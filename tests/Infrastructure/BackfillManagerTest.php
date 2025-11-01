@@ -92,5 +92,8 @@ final class BackfillManagerTest extends TestCase
         self::assertSame('wp_axs4all_ai_classifications', $resultClientUpdate['table']);
         self::assertSame(['client_id' => 5], $resultClientUpdate['data']);
         self::assertSame(['id' => 200, 'client_id' => 0], $resultClientUpdate['where']);
+
+        $contentUrlQueries = array_filter($wpdb->queryLog, static fn(array $entry): bool => isset($entry['query']) && strpos($entry['query'], 'content_url') !== false);
+        self::assertNotEmpty($contentUrlQueries);
     }
 }

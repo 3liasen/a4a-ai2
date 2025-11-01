@@ -24,6 +24,7 @@ final class ClassificationQueueRepositoryTest extends TestCase
                     self::assertSame('default', $data['category']);
                     self::assertSame('pending', $data['status']);
                     self::assertSame('sample', $data['content']);
+                    self::assertSame('https://example.com/subpage', $data['content_url']);
                     self::assertSame(3, $data['client_id']);
                     self::assertSame(7, $data['category_id']);
                     return true;
@@ -35,7 +36,7 @@ final class ClassificationQueueRepositoryTest extends TestCase
             });
 
         $repository = new ClassificationQueueRepository($wpdb);
-        $id = $repository->enqueue(10, null, 'default', 'v1', 'sample', 3, 7);
+        $id = $repository->enqueue(10, null, 'default', 'v1', 'sample', 3, 7, 'https://example.com/subpage');
 
         self::assertSame(99, $id);
     }
@@ -52,6 +53,7 @@ final class ClassificationQueueRepositoryTest extends TestCase
                 self::callback(function (array $data): bool {
                     self::assertSame('done', $data['status']);
                     self::assertSame('', $data['last_error']);
+                    self::assertSame('https://example.com/subpage', $data['content_url']);
                     return true;
                 }),
                 ['id' => 7],
@@ -73,6 +75,7 @@ final class ClassificationQueueRepositoryTest extends TestCase
                     self::assertSame('binary', $data['decision_scale']);
                     self::assertSame(21, $data['client_id']);
                     self::assertSame(4, $data['category_id']);
+                    self::assertSame('https://example.com/subpage', $data['content_url']);
                     return true;
                 })
             )
@@ -92,6 +95,7 @@ final class ClassificationQueueRepositoryTest extends TestCase
                 'queue_id' => 5,
                 'extraction_id' => null,
                 'prompt_version' => 'v2',
+                'content_url' => 'https://example.com/subpage',
             ],
             $result,
             $result->metrics(),
@@ -101,6 +105,7 @@ final class ClassificationQueueRepositoryTest extends TestCase
                 'category_id' => 4,
                 'decision_value' => 'yes',
                 'decision_scale' => 'binary',
+                'content_url' => 'https://example.com/subpage',
             ]
         );
     }
@@ -145,6 +150,7 @@ final class ClassificationQueueRepositoryTest extends TestCase
                 'duration_ms' => 40,
                 'created_at' => '2024-01-15 10:00:00',
                 'source_url' => 'https://example.com',
+                'content_url' => '',
                 'category' => 'museum',
                 'confidence' => 0.9,
             ],
@@ -164,6 +170,7 @@ final class ClassificationQueueRepositoryTest extends TestCase
 
         self::assertCount(1, $results);
         self::assertSame('https://example.com', $results[0]['source_url']);
+        self::assertSame('https://example.com', $results[0]['content_url']);
 
         $prepareLogs = array_values(array_filter(
             $wpdb->queryLog,
@@ -212,6 +219,7 @@ final class ClassificationQueueRepositoryTest extends TestCase
             'decision' => 'yes',
             'raw_response' => '{"decision":"yes"}',
             'source_url' => 'https://example.com',
+            'content_url' => '',
         ];
 
         $repository = new ClassificationQueueRepository($wpdb);
@@ -220,5 +228,6 @@ final class ClassificationQueueRepositoryTest extends TestCase
         self::assertNotNull($row);
         self::assertSame(9, $row['id']);
         self::assertSame('https://example.com', $row['source_url']);
+        self::assertSame('https://example.com', $row['content_url']);
     }
 }

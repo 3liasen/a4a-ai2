@@ -8,7 +8,7 @@ use wpdb;
 
 final class Installer
 {
-    private const DB_VERSION = '1.4.0';
+    private const DB_VERSION = '1.5.0';
     private const OPTION_KEY = 'axs4all_ai_db_version';
 
     public static function activate(): void
@@ -144,6 +144,7 @@ final class Installer
             status VARCHAR(32) NOT NULL DEFAULT 'pending',
             attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
             content LONGTEXT NOT NULL,
+            content_url TEXT NULL,
             last_error TEXT NULL,
             locked_at DATETIME NULL,
             created_at DATETIME NOT NULL,
@@ -172,6 +173,7 @@ final class Installer
             tokens_completion INT UNSIGNED DEFAULT NULL,
             duration_ms INT UNSIGNED DEFAULT NULL,
             raw_response LONGTEXT NOT NULL,
+            content_url TEXT NULL,
             created_at DATETIME NOT NULL,
             PRIMARY KEY  (id),
             KEY queue_id (queue_id),

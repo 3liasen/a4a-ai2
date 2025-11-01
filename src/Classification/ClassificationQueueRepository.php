@@ -34,10 +34,13 @@ final class ClassificationQueueRepository
         string $promptVersion,
         string $content,
         ?int $clientId = null,
-        ?int $categoryId = null
+        ?int $categoryId = null,
+        ?string $contentUrl = null
     ): ?int
     {
         $now = current_time('mysql');
+        $sanitisedContentUrl = $this->sanitizeContentUrl($contentUrl);
+
         $data = [
             'queue_id' => $queueId,
             'extraction_id' => $extractionId !== null ? $extractionId : null,
@@ -48,6 +51,7 @@ final class ClassificationQueueRepository
             'status' => self::STATUS_PENDING,
             'attempts' => 0,
             'content' => $content,
+            'content_url' => $sanitisedContentUrl,
             'created_at' => $now,
             'updated_at' => $now,
         ];
@@ -55,7 +59,7 @@ final class ClassificationQueueRepository
         $result = $this->wpdb->insert(
             $this->queueTable,
             $data,
-            ['%d', '%s', '%d', '%d', '%s', '%s', '%s', '%d', '%s', '%s', '%s']
+            ['%d', '%s', '%d', '%d', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s']
         );
 
         if ($result === false) {
@@ -123,6 +127,11 @@ final class ClassificationQueueRepository
         $categoryId = isset($extra['category_id']) ? (int) $extra['category_id'] : (isset($job['category_id']) ? (int) $job['category_id'] : 0);
         $decisionValue = isset($extra['decision_value']) ? (string) $extra['decision_value'] : $result->decision();
         $decisionScale = isset($extra['decision_scale']) ? (string) $extra['decision_scale'] : '';
+        $contentUrl = $this->sanitizeContentUrl($extra['content_url'] ?? ($job['content_url'] ?? null));
+        if ($contentUrl === '' && $queueId > 0) {
+            $sourceUrl = $this->wpdb->get_var($this->wpdb->prepare("SELECT source_url FROM {$this->crawlTable} WHERE id = %d", $queueId));
+            $contentUrl = $this->sanitizeContentUrl(is_string($sourceUrl) ? $sourceUrl : null);
+        }
 
         $this->wpdb->update(
             $this->queueTable,
@@ -131,9 +140,10 @@ final class ClassificationQueueRepository
                 'locked_at' => null,
                 'last_error' => '',
                 'updated_at' => current_time('mysql'),
+                'content_url' => $contentUrl !== '' ? $contentUrl : null,
             ],
             ['id' => $jobId],
-            ['%s', '%s', '%s', '%s'],
+            ['%s', '%s', '%s', '%s', '%s'],
             ['%d']
         );
 
@@ -152,13 +162,14 @@ final class ClassificationQueueRepository
             'tokens_completion' => isset($metrics['tokens_completion']) ? (int) $metrics['tokens_completion'] : null,
             'duration_ms' => isset($metrics['duration_ms']) ? (int) $metrics['duration_ms'] : null,
             'raw_response' => $result->rawResponse(),
+            'content_url' => $contentUrl !== '' ? $contentUrl : null,
             'created_at' => current_time('mysql'),
         ];
 
         $this->wpdb->insert(
             $this->resultsTable,
             $data,
-            ['%d', '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s']
+            ['%d', '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s']
         );
     }
 
@@ -236,8 +247,18 @@ final class ClassificationQueueRepository
 
         $prepared = $this->prepare($sql, $params);
         $rows = $this->wpdb->get_results($prepared, ARRAY_A);
+        if (! is_array($rows)) {
+            return [];
+        }
 
-        return is_array($rows) ? $rows : [];
+        foreach ($rows as &$row) {
+            if ((empty($row['content_url']) || ! is_string($row['content_url'])) && ! empty($row['source_url'])) {
+                $row['content_url'] = (string) $row['source_url'];
+            }
+        }
+        unset($row);
+
+        return $rows;
     }
 
     /**
@@ -372,8 +393,15 @@ final class ClassificationQueueRepository
         );
 
         $row = $this->wpdb->get_row($sql, ARRAY_A);
+        if ($row === null) {
+            return null;
+        }
 
-        return $row !== null ? $row : null;
+        if ((empty($row['content_url']) || ! is_string($row['content_url'])) && ! empty($row['source_url'])) {
+            $row['content_url'] = (string) $row['source_url'];
+        }
+
+        return $row;
     }
 
     /**
@@ -440,6 +468,22 @@ final class ClassificationQueueRepository
         }
 
         return [implode(' ', $clauses), $params];
+    }
+
+    private function sanitizeContentUrl($url): string
+    {
+        if ($url === null) {
+            return '';
+        }
+
+        $trimmed = trim((string) $url);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        $sanitized = esc_url_raw($trimmed);
+
+        return is_string($sanitized) ? $sanitized : '';
     }
 
     private function normalizeDate(string $date, bool $endOfDay): ?string

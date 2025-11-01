@@ -178,6 +178,7 @@ final class ManualClassificationPage
         $categoryId = $this->matchCategoryId($categorySlug);
         $clientId = $clientId > 0 ? $clientId : null;
         $queueId = 0;
+        $contentUrl = '';
 
         if ($url !== '') {
             $normalizedUrl = esc_url_raw($url);
@@ -200,6 +201,8 @@ final class ManualClassificationPage
             if ($queueId === null) {
                 $this->redirect('manual_error', __('Failed to store the URL in the crawl queue.', 'axs4all-ai'));
             }
+
+            $contentUrl = $normalizedUrl;
         }
 
         $jobId = $this->classificationQueue->enqueue(
@@ -209,7 +212,8 @@ final class ManualClassificationPage
             $prompt->version(),
             $content,
             $clientId,
-            $categoryId
+            $categoryId,
+            $contentUrl
         );
 
         if (! $jobId) {

@@ -30,6 +30,8 @@ final class BackfillManager
             $this->backfillCrawlQueueClients($wpdb, $queueClientMap);
             $this->backfillResultClients($wpdb, $queueClientMap);
         }
+
+        $this->backfillContentUrls($wpdb);
     }
 
     private function ensureQueueHasSubpageFlag(wpdb $wpdb): void
@@ -283,6 +285,55 @@ final class BackfillManager
                 ['%d', '%d']
             );
         }
+    }
+
+    private function backfillContentUrls(wpdb $wpdb): void
+    {
+        $classificationQueueTable = $wpdb->prefix . 'axs4all_ai_classifications_queue';
+        $queueTable = $wpdb->prefix . 'axs4all_ai_queue';
+        $classificationsTable = $wpdb->prefix . 'axs4all_ai_classifications';
+
+        // Populate classification queue content URLs from the originating crawl queue entry.
+        $wpdb->query(
+            "
+            UPDATE {$classificationQueueTable} cq
+            LEFT JOIN {$queueTable} q ON q.id = cq.queue_id
+            SET cq.content_url = q.source_url
+            WHERE (cq.content_url IS NULL OR cq.content_url = '')
+              AND q.source_url IS NOT NULL
+              AND q.source_url <> ''
+            "
+        );
+
+        // Propagate content URLs into the classification results table.
+        $wpdb->query(
+            "
+            UPDATE {$classificationsTable} r
+            LEFT JOIN {$classificationQueueTable} cq
+                ON cq.queue_id = r.queue_id
+                AND (
+                    (cq.category_id > 0 AND cq.category_id = r.category_id)
+                    OR (cq.category_id = 0 AND (r.category_id IS NULL OR r.category_id = 0))
+                )
+                AND cq.prompt_version = r.prompt_version
+            SET r.content_url = cq.content_url
+            WHERE (r.content_url IS NULL OR r.content_url = '')
+              AND cq.content_url IS NOT NULL
+              AND cq.content_url <> ''
+            "
+        );
+
+        // Fallback: if classification queue has no content URL, reuse the crawl queue URL.
+        $wpdb->query(
+            "
+            UPDATE {$classificationsTable} r
+            LEFT JOIN {$queueTable} q ON q.id = r.queue_id
+            SET r.content_url = q.source_url
+            WHERE (r.content_url IS NULL OR r.content_url = '')
+              AND q.source_url IS NOT NULL
+              AND q.source_url <> ''
+            "
+        );
     }
 
     /**

@@ -110,6 +110,7 @@ final class ClassificationRunner
                         'category_id' => $resolvedCategoryId,
                         'decision_value' => $result->decision(),
                         'decision_scale' => $decisionSet,
+                        'content_url' => $metadata['url'],
                     ]
                 );
             }
@@ -234,9 +235,18 @@ final class ClassificationRunner
         array $phrases,
         string $categoryPrompt
     ): array {
+        $url = '';
+        if (! empty($job['content_url'])) {
+            $url = (string) $job['content_url'];
+        } elseif (! empty($job['url'])) {
+            $url = (string) $job['url'];
+        } elseif (! empty($job['source_url'])) {
+            $url = (string) $job['source_url'];
+        }
+
         $metadata = [
             'category' => $categoryName,
-            'url' => isset($job['url']) ? (string) $job['url'] : '',
+            'url' => $url,
             'previous_decision' => isset($job['previous_decision']) ? (string) $job['previous_decision'] : '',
             'decision_options' => implode(', ', $decisionOptions),
             'decision_options_raw' => implode('|', $decisionOptions),
