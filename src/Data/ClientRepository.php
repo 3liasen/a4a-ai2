@@ -41,6 +41,8 @@ final class ClientRepository
             return [];
         }
 
+        $rows = array_map([$this, 'forceArray'], $rows);
+
         return array_map([$this, 'mapClientRow'], $rows);
     }
 
@@ -54,16 +56,19 @@ final class ClientRepository
         if (! $client) {
             return null;
         }
+        $client = $this->forceArray($client);
 
         $urls = $this->wpdb->get_results(
             $this->wpdb->prepare("SELECT * FROM {$this->urlsTable} WHERE client_id = %d ORDER BY id ASC", $id),
             ARRAY_A
         ) ?: [];
+        $urls = array_map([$this, 'forceArray'], $urls);
 
         $categories = $this->wpdb->get_results(
             $this->wpdb->prepare("SELECT * FROM {$this->pivotTable} WHERE client_id = %d", $id),
             ARRAY_A
         ) ?: [];
+        $categories = array_map([$this, 'forceArray'], $categories);
 
         $client = $this->mapClientRow($client);
         $client['urls'] = array_map(
@@ -256,6 +261,8 @@ final class ClientRepository
             ARRAY_A
         ) ?: [];
 
+        $rows = array_map([$this, 'forceArray'], $rows);
+
         return array_map(
             static fn(array $row): int => (int) $row['category_id'],
             $rows
@@ -315,5 +322,22 @@ final class ClientRepository
         $normalized = esc_url_raw($url);
 
         return $normalized !== false ? $normalized : '';
+    }
+
+    /**
+     * @param mixed $row
+     * @return array<string, mixed>
+     */
+    private function forceArray($row): array
+    {
+        if (is_array($row)) {
+            return $row;
+        }
+
+        if (is_object($row)) {
+            return get_object_vars($row);
+        }
+
+        return [];
     }
 }
