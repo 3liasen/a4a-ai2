@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Plugin Name:       axs4all AI Accessibility
  * Description:       Automates accessibility data collection and AI-driven classification for axs4all.
