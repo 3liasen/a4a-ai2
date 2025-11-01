@@ -9,6 +9,7 @@ final class ExchangeRateUpdater
     private const OPTION_KEY = 'axs4all_ai_exchange_rate';
     private const HOOK = 'axs4all_ai_update_exchange_rate';
     private ?string $lastError = null;
+    private ?string $lastResponse = null;
 
     public function register(): void
     {
@@ -29,6 +30,7 @@ final class ExchangeRateUpdater
     public function updateRate(bool $force = false): bool
     {
         $this->lastError = null;
+        $this->lastResponse = null;
         $settings = get_option('axs4all_ai_settings', []);
         $auto = isset($settings['exchange_rate_auto']) ? (bool) $settings['exchange_rate_auto'] : false;
         if (! $auto && ! $force) {
@@ -61,12 +63,24 @@ final class ExchangeRateUpdater
 
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
-        if (! is_array($data) || empty($data['success']) || empty($data['rates']['DKK'])) {
-            $this->lastError = __('Malformed response from exchangerate.host.', 'axs4all-ai');
+        $this->lastResponse = is_string($body) ? $body : '';
+
+        $rate = null;
+        if (is_array($data) && isset($data['rates']['DKK'])) {
+            $rate = (float) $data['rates']['DKK'];
+        }
+
+        if (! is_array($data) || $rate === null) {
+            $snippet = $this->summarizeResponse($this->lastResponse);
+            $this->lastError = sprintf(
+                /* translators: %s: truncated response payload */
+                __('Malformed response from exchangerate.host. Payload: %s', 'axs4all-ai'),
+                $snippet
+            );
+            update_option('axs4all_ai_exchange_rate_debug', $this->lastResponse, false);
             return false;
         }
 
-        $rate = (float) $data['rates']['DKK'];
         if ($rate <= 0) {
             $this->lastError = __('Fetched exchange rate was zero or negative.', 'axs4all-ai');
             return false;
@@ -86,6 +100,25 @@ final class ExchangeRateUpdater
     public function getLastError(): ?string
     {
         return $this->lastError;
+    }
+
+    public function getLastResponse(): ?string
+    {
+        return $this->lastResponse;
+    }
+
+    private function summarizeResponse(?string $body): string
+    {
+        if ($body === null || $body === '') {
+            return __('(empty response)', 'axs4all-ai');
+        }
+
+        $clean = preg_replace('/\s+/', ' ', $body) ?? $body;
+        if (strlen($clean) > 180) {
+            $clean = substr($clean, 0, 180) . '...';
+        }
+
+        return $clean;
     }
 
     public static function getStoredRate(): ?array

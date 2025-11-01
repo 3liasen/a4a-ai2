@@ -78,5 +78,14 @@ final class ExchangeRateUpdaterTest extends TestCase
         $updater = new ExchangeRateUpdater();
         self::assertFalse($updater->updateRate());
         self::assertSame('Unexpected response code: 500', $updater->getLastError());
+
+        $GLOBALS['wp_remote_get_queue'][] = [
+            'response' => ['code' => 200],
+            'body' => '{"foo":"bar"}',
+        ];
+
+        self::assertFalse($updater->updateRate(true));
+        self::assertStringContainsString('Malformed response from exchangerate.host.', $updater->getLastError());
+        self::assertNotNull($updater->getLastResponse());
     }
 }
