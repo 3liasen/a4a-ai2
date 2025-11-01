@@ -8,6 +8,7 @@ use Axs4allAi\Admin\CategoryPage;
 use Axs4allAi\Admin\ClientPage;
 use Axs4allAi\Admin\ClassificationResultsPage;
 use Axs4allAi\Admin\DebugPage;
+use Axs4allAi\Admin\Footer;
 use Axs4allAi\Admin\ManualClassificationPage;
 use Axs4allAi\Admin\PromptPage;
 use Axs4allAi\Admin\QueuePage;
@@ -45,10 +46,12 @@ final class Plugin
     private ClientRepository $clientRepository;
     private ExchangeRateUpdater $exchangeRateUpdater;
     private array $settings;
+    private string $version;
     public function __construct()
     {
         global $wpdb;
 
+        $this->version = (string) require AXS4ALL_AI_VERSION_FILE;
         $this->queueRepository = new QueueRepository($wpdb);
         $this->promptRepository = new PromptRepository($wpdb);
         $this->categoryRegistrar = new CategoryRegistrar();
@@ -131,6 +134,7 @@ final class Plugin
         $categoryPage = new CategoryPage($this->categoryRepository);
         $clientPage = new ClientPage($this->clientRepository, $this->categoryRepository);
         $classificationPage = new ClassificationResultsPage($this->classificationQueueRepository);
+        $footer = new Footer($this->version);
 
         add_action('admin_menu', [$settings, 'registerMenu']);
         add_action('admin_menu', [$queuePage, 'registerMenu']);
@@ -149,6 +153,7 @@ final class Plugin
         add_action('admin_init', [$categoryPage, 'registerActions']);
         add_action('admin_init', [$clientPage, 'registerActions']);
         add_action('admin_init', [$manualPage, 'registerActions']);
+        $footer->register();
     }
 
     private function registerCliCommands(): void
