@@ -371,15 +371,15 @@ final class SettingsPage
         check_admin_referer('axs4all_ai_sync_exchange_rate');
 
         $updater = new ExchangeRateUpdater();
-        $updater->updateRate(true);
-
-        $stored = ExchangeRateUpdater::getStoredRate();
-        $status = is_array($stored) ? 'success' : 'error';
+        $success = $updater->updateRate(true);
+        $status = $success ? 'success' : 'error';
+        $message = $success ? '' : (string) $updater->getLastError();
 
         $redirectUrl = add_query_arg(
             [
                 'page' => 'axs4all-ai',
                 'exchange_rate_sync' => $status,
+                'exchange_rate_message' => $message !== '' ? rawurlencode($message) : null,
             ],
             admin_url('admin.php')
         );
@@ -439,9 +439,14 @@ final class SettingsPage
         }
 
         $class = $status === 'success' ? 'notice notice-success' : 'notice notice-error';
+        $custom = '';
+        if (! empty($_GET['exchange_rate_message'])) {
+            $custom = sanitize_text_field(wp_unslash((string) $_GET['exchange_rate_message']));
+        }
+
         $message = $status === 'success'
             ? __('Exchange rate updated successfully.', 'axs4all-ai')
-            : __('Failed to refresh the exchange rate. Please try again later.', 'axs4all-ai');
+            : ($custom !== '' ? $custom : __('Failed to refresh the exchange rate. Please try again later.', 'axs4all-ai'));
 
         printf(
             '<div class="%1$s"><p>%2$s</p></div>',

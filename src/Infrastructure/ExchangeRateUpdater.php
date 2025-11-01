@@ -8,6 +8,7 @@ final class ExchangeRateUpdater
 {
     private const OPTION_KEY = 'axs4all_ai_exchange_rate';
     private const HOOK = 'axs4all_ai_update_exchange_rate';
+    private ?string $lastError = null;
 
     public function register(): void
     {
@@ -25,12 +26,14 @@ final class ExchangeRateUpdater
         wp_schedule_event($timestamp, 'daily', self::HOOK);
     }
 
-    public function updateRate(bool $force = false): void
+    public function updateRate(bool $force = false): bool
     {
+        $this->lastError = null;
         $settings = get_option('axs4all_ai_settings', []);
         $auto = isset($settings['exchange_rate_auto']) ? (bool) $settings['exchange_rate_auto'] : false;
         if (! $auto && ! $force) {
-            return;
+            $this->lastError = __('Automatic exchange rate updates are disabled.', 'axs4all-ai');
+            return false;
         }
 
         $response = wp_remote_get('https://api.exchangerate.host/latest?base=USD&symbols=DKK', [
@@ -38,23 +41,35 @@ final class ExchangeRateUpdater
         ]);
 
         if (is_wp_error($response)) {
-            return;
+            $this->lastError = sprintf(
+                /* translators: %s: transport error message */
+                __('HTTP request failed: %s', 'axs4all-ai'),
+                $response->get_error_message()
+            );
+            return false;
         }
 
         $code = wp_remote_retrieve_response_code($response);
         if ($code !== 200) {
-            return;
+            $this->lastError = sprintf(
+                /* translators: %d: HTTP status code */
+                __('Unexpected response code: %d', 'axs4all-ai'),
+                $code
+            );
+            return false;
         }
 
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
         if (! is_array($data) || empty($data['success']) || empty($data['rates']['DKK'])) {
-            return;
+            $this->lastError = __('Malformed response from exchangerate.host.', 'axs4all-ai');
+            return false;
         }
 
         $rate = (float) $data['rates']['DKK'];
         if ($rate <= 0) {
-            return;
+            $this->lastError = __('Fetched exchange rate was zero or negative.', 'axs4all-ai');
+            return false;
         }
 
         self::storeRate($rate);
@@ -64,6 +79,13 @@ final class ExchangeRateUpdater
         }
         $settings['exchange_rate'] = $rate;
         update_option('axs4all_ai_settings', $settings);
+
+        return true;
+    }
+
+    public function getLastError(): ?string
+    {
+        return $this->lastError;
     }
 
     public static function getStoredRate(): ?array

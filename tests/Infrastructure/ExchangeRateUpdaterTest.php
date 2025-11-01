@@ -50,7 +50,7 @@ final class ExchangeRateUpdaterTest extends TestCase
         ];
 
         $updater = new ExchangeRateUpdater();
-        $updater->updateRate();
+        self::assertTrue($updater->updateRate());
 
         $stored = ExchangeRateUpdater::getStoredRate();
         self::assertNotNull($stored);
@@ -61,5 +61,22 @@ final class ExchangeRateUpdaterTest extends TestCase
 
         ExchangeRateUpdater::storeRate(0.0);
         self::assertNull(ExchangeRateUpdater::getStoredRate());
+    }
+
+    public function testUpdateRateFailureStoresError(): void
+    {
+        update_option('axs4all_ai_settings', [
+            'exchange_rate_auto' => 1,
+            'exchange_rate' => 0.0,
+        ]);
+
+        $GLOBALS['wp_remote_get_queue'][] = [
+            'response' => ['code' => 500],
+            'body' => '{}',
+        ];
+
+        $updater = new ExchangeRateUpdater();
+        self::assertFalse($updater->updateRate());
+        self::assertSame('Unexpected response code: 500', $updater->getLastError());
     }
 }
