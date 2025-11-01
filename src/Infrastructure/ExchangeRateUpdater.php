@@ -38,7 +38,21 @@ final class ExchangeRateUpdater
             return false;
         }
 
-        $response = wp_remote_get('https://api.exchangerate.host/latest?base=USD&symbols=DKK', [
+        $apiKey = is_array($settings) && ! empty($settings['exchange_rate_api_key'])
+            ? (string) $settings['exchange_rate_api_key']
+            : '';
+
+        $query = [
+            'base' => 'USD',
+            'symbols' => 'DKK',
+        ];
+        if ($apiKey !== '') {
+            $query['access_key'] = $apiKey;
+        }
+
+        $url = 'https://api.exchangerate.host/latest?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+
+        $response = wp_remote_get($url, [
             'timeout' => 10,
         ]);
 
@@ -71,12 +85,26 @@ final class ExchangeRateUpdater
         }
 
         if (! is_array($data) || $rate === null) {
-            $snippet = $this->summarizeResponse($this->lastResponse);
-            $this->lastError = sprintf(
-                /* translators: %s: truncated response payload */
-                __('Malformed response from exchangerate.host. Payload: %s', 'axs4all-ai'),
-                $snippet
-            );
+            if (isset($data['error'])) {
+                $errorInfo = is_array($data['error']) ? ($data['error']['info'] ?? $data['error']['type'] ?? '') : '';
+                if ($errorInfo !== '') {
+                    $this->lastError = sprintf(
+                        /* translators: %s: provider error message */
+                        __('exchangerate.host error: %s', 'axs4all-ai'),
+                        $errorInfo
+                    );
+                }
+            }
+
+            if ($this->lastError === null) {
+                $snippet = $this->summarizeResponse($this->lastResponse);
+                $this->lastError = sprintf(
+                    /* translators: %s: truncated response payload */
+                    __('Malformed response from exchangerate.host. Payload: %s', 'axs4all-ai'),
+                    $snippet
+                );
+            }
+
             update_option('axs4all_ai_exchange_rate_debug', $this->lastResponse, false);
             return false;
         }

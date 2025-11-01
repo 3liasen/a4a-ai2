@@ -125,6 +125,14 @@ final class SettingsPage
         );
 
         add_settings_field(
+            'axs4all_ai_exchange_rate_api_key',
+            __('exchangerate.host API key', 'axs4all-ai'),
+            [$this, 'renderExchangeRateApiKeyField'],
+            'axs4all-ai',
+            'axs4all_ai_classification_section'
+        );
+
+        add_settings_field(
             'axs4all_ai_exchange_rate',
             __('USD to DKK rate', 'axs4all-ai'),
             [$this, 'renderExchangeRateField'],
@@ -194,6 +202,9 @@ final class SettingsPage
             ExchangeRateUpdater::storeRate(0.0);
         }
         $output['exchange_rate'] = $manualRate;
+        $output['exchange_rate_api_key'] = isset($input['exchange_rate_api_key'])
+            ? sanitize_text_field((string) $input['exchange_rate_api_key'])
+            : ($existing['exchange_rate_api_key'] ?? '');
 
         return $output;
     }
@@ -332,6 +343,19 @@ final class SettingsPage
             'axs4all_ai_sync_exchange_rate'
         );
         echo '<p><a class="button" href="' . esc_url($syncUrl) . '">' . esc_html__('Sync now', 'axs4all-ai') . '</a></p>';
+    }
+
+    public function renderExchangeRateApiKeyField(): void
+    {
+        $options = get_option(self::OPTION_NAME, []);
+        $value = isset($options['exchange_rate_api_key']) ? (string) $options['exchange_rate_api_key'] : '';
+
+        printf(
+            '<input type="text" name="%1$s[exchange_rate_api_key]" value="%2$s" class="regular-text" autocomplete="off" />',
+            esc_attr(self::OPTION_NAME),
+            esc_attr($value)
+        );
+        echo '<p class="description">' . esc_html__('Optional access key if your exchangerate.host endpoint requires authentication. Leave blank to use unauthenticated requests.', 'axs4all-ai') . '</p>';
     }
 
     public function renderExchangeRateField(): void
