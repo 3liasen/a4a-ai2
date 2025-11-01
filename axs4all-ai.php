@@ -9,7 +9,6 @@
  * Text Domain:       axs4all-ai
  */
 
-declare(strict_types=1);
 
 use Axs4allAi\Classification\ClassificationScheduler;
 use Axs4allAi\Crawl\CrawlScheduler;
