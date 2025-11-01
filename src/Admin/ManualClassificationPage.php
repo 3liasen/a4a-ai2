@@ -9,6 +9,7 @@ use Axs4allAi\Classification\ClassificationQueueRepository;
 use Axs4allAi\Classification\ClassificationRunner;
 use Axs4allAi\Classification\PromptRepository;
 use Axs4allAi\Data\ClientRepository;
+use Axs4allAi\Data\QueueRepository;
 
 final class ManualClassificationPage
 {
@@ -16,24 +17,27 @@ final class ManualClassificationPage
     private const ACTION_SUBMIT = 'axs4all_ai_manual_classify';
     private const NONCE = 'axs4all_ai_manual_nonce';
 
-    private ClassificationQueueRepository $queue;
+    private ClassificationQueueRepository $classificationQueue;
     private ClassificationRunner $runner;
     private PromptRepository $prompts;
     private ?CategoryRepository $categories;
     private ?ClientRepository $clients;
+    private ?QueueRepository $crawlQueue;
 
     public function __construct(
-        ClassificationQueueRepository $queue,
+        ClassificationQueueRepository $classificationQueue,
         ClassificationRunner $runner,
         PromptRepository $prompts,
         ?CategoryRepository $categories = null,
-        ?ClientRepository $clients = null
+        ?ClientRepository $clients = null,
+        ?QueueRepository $crawlQueue = null
     ) {
-        $this->queue = $queue;
+        $this->classificationQueue = $classificationQueue;
         $this->runner = $runner;
         $this->prompts = $prompts;
         $this->categories = $categories;
         $this->clients = $clients;
+        $this->crawlQueue = $crawlQueue;
     }
 
     public function registerMenu(): void
@@ -113,6 +117,23 @@ final class ManualClassificationPage
                         </td>
                     </tr>
                     <tr>
+                        <th scope="row"><label for="axs4all-ai-manual-url"><?php esc_html_e('Source URL (optional)', 'axs4all-ai'); ?></label></th>
+                        <td>
+                            <input type="url" name="manual_url" id="axs4all-ai-manual-url" class="regular-text" placeholder="https://example.com/page">
+                            <p class="description"><?php esc_html_e('Save a reference URL and queue it for crawling when needed.', 'axs4all-ai'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e('Crawl subpages', 'axs4all-ai'); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="manual_crawl_subpages" value="1">
+                                <?php esc_html_e('Queue subpages for crawling as well.', 'axs4all-ai'); ?>
+                            </label>
+                            <p class="description"><?php esc_html_e('Applies only when a source URL is provided.', 'axs4all-ai'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
                         <th scope="row"><?php esc_html_e('Run immediately', 'axs4all-ai'); ?></th>
                         <td>
                             <label>
@@ -141,6 +162,8 @@ final class ManualClassificationPage
         $content = isset($_POST['manual_content']) ? trim((string) wp_unslash($_POST['manual_content'])) : '';
         $categorySlug = isset($_POST['manual_category']) ? sanitize_title((string) wp_unslash($_POST['manual_category'])) : '';
         $clientId = isset($_POST['manual_client']) ? (int) $_POST['manual_client'] : 0;
+        $url = isset($_POST['manual_url']) ? trim((string) wp_unslash($_POST['manual_url'])) : '';
+        $crawlSubpages = ! empty($_POST['manual_crawl_subpages']);
         $runNow = ! empty($_POST['manual_run_now']);
 
         if ($content === '') {
@@ -154,9 +177,26 @@ final class ManualClassificationPage
         $prompt = $this->prompts->getActiveTemplate($categorySlug);
         $categoryId = $this->matchCategoryId($categorySlug);
         $clientId = $clientId > 0 ? $clientId : null;
+        $queueId = 0;
 
-        $jobId = $this->queue->enqueue(
-            0,
+        if ($url !== '') {
+            $normalizedUrl = esc_url_raw($url);
+            if (! $normalizedUrl) {
+                $this->redirect('manual_error', __('Please enter a valid URL or leave the field empty.', 'axs4all-ai'));
+            }
+
+            if (! $this->crawlQueue instanceof QueueRepository) {
+                $this->redirect('manual_error', __('Crawl queue is not available.', 'axs4all-ai'));
+            }
+
+            $queueId = $this->crawlQueue->enqueueWithId($normalizedUrl, $categorySlug, 5, $crawlSubpages);
+            if ($queueId === null) {
+                $this->redirect('manual_error', __('Failed to store the URL in the crawl queue.', 'axs4all-ai'));
+            }
+        }
+
+        $jobId = $this->classificationQueue->enqueue(
+            $queueId,
             null,
             $categorySlug,
             $prompt->version(),
@@ -170,7 +210,7 @@ final class ManualClassificationPage
         }
 
         if ($runNow) {
-            $job = $this->queue->findJob($jobId);
+            $job = $this->classificationQueue->findJob($jobId);
             if ($job !== null) {
                 $this->runner->process([$job]);
             }

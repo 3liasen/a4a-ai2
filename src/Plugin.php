@@ -116,7 +116,8 @@ final class Plugin
             $this->classificationRunner,
             $this->promptRepository,
             $this->categoryRepository,
-            $this->clientRepository
+            $this->clientRepository,
+            $this->queueRepository
         );
         $billingPage = new BillingPage($this->classificationQueueRepository);
         $categoryPage = new CategoryPage($this->categoryRepository);

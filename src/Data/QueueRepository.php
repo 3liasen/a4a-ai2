@@ -17,17 +17,23 @@ final class QueueRepository
         $this->table = $wpdb->prefix . 'axs4all_ai_queue';
     }
 
-    public function enqueue(string $url, string $category, int $priority = 5): bool
+    public function enqueue(string $url, string $category, int $priority = 5, bool $crawlSubpages = false): bool
+    {
+        return $this->enqueueWithId($url, $category, $priority, $crawlSubpages) !== null;
+    }
+
+    public function enqueueWithId(string $url, string $category, int $priority = 5, bool $crawlSubpages = false): ?int
     {
         $normalizedUrl = $this->normalizeUrl($url);
         if ($normalizedUrl === null) {
-            return false;
+            return null;
         }
 
         $category = sanitize_text_field($category);
         $priority = max(1, min(9, $priority));
         $hash = hash('sha256', strtolower($normalizedUrl));
         $now = current_time('mysql');
+        $subpagesFlag = $crawlSubpages ? 1 : 0;
 
         $existingId = $this->wpdb->get_var(
             $this->wpdb->prepare(
@@ -46,14 +52,15 @@ final class QueueRepository
                     'status' => 'pending',
                     'attempts' => 0,
                     'last_error' => null,
+                    'crawl_subpages' => $subpagesFlag,
                     'updated_at' => $now,
                 ],
                 ['id' => (int) $existingId],
-                ['%s', '%s', '%d', '%s', '%d', '%s', '%s'],
+                ['%s', '%s', '%d', '%s', '%d', '%s', '%d', '%s'],
                 ['%d']
             );
 
-            return $updated !== false;
+            return $updated !== false ? (int) $existingId : null;
         }
 
         $inserted = $this->wpdb->insert(
@@ -69,11 +76,16 @@ final class QueueRepository
                 'last_attempted_at' => null,
                 'created_at' => $now,
                 'updated_at' => $now,
+                'crawl_subpages' => $subpagesFlag,
             ],
-            ['%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s']
+            ['%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%d']
         );
 
-        return $inserted !== false;
+        if ($inserted === false) {
+            return null;
+        }
+
+        return (int) $this->wpdb->insert_id;
     }
 
     /**
@@ -83,7 +95,7 @@ final class QueueRepository
     {
         $limit = max(1, $limit);
         $query = $this->wpdb->prepare(
-            "SELECT id, source_url, category, status, priority, attempts, created_at, updated_at
+            "SELECT id, source_url, category, status, priority, attempts, crawl_subpages, created_at, updated_at
              FROM {$this->table}
              ORDER BY created_at DESC
              LIMIT %d",
@@ -103,7 +115,7 @@ final class QueueRepository
     {
         $limit = max(1, $limit);
         $query = $this->wpdb->prepare(
-            "SELECT id, source_url, category
+            "SELECT id, source_url, category, crawl_subpages
              FROM {$this->table}
              WHERE status = %s
              ORDER BY priority ASC, created_at ASC
