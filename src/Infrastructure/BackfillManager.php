@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Axs4allAi\Infrastructure;
 
+use Axs4allAi\Data\ClientRepository;
 use wpdb;
 
 final class BackfillManager
@@ -11,6 +12,7 @@ final class BackfillManager
     public function run(wpdb $wpdb): void
     {
         $this->ensureQueueHasSubpageFlag($wpdb);
+        $this->ensureClientFrequencies($wpdb);
 
         $categoryMap = $this->buildCategoryMap($wpdb);
         if (! empty($categoryMap)) {
@@ -32,6 +34,18 @@ final class BackfillManager
     {
         $queueTable = $wpdb->prefix . 'axs4all_ai_queue';
         $wpdb->query("UPDATE {$queueTable} SET crawl_subpages = 0 WHERE crawl_subpages IS NULL");
+    }
+
+    private function ensureClientFrequencies(wpdb $wpdb): void
+    {
+        $clientsTable = $wpdb->prefix . 'axs4all_ai_clients';
+        $default = ClientRepository::DEFAULT_FREQUENCY;
+        $wpdb->query(
+            $wpdb->prepare(
+                "UPDATE {$clientsTable} SET crawl_frequency = %s WHERE crawl_frequency IS NULL OR crawl_frequency = ''",
+                $default
+            )
+        );
     }
 
     /**

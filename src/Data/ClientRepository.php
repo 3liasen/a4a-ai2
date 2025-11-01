@@ -12,6 +12,8 @@ final class ClientRepository
     private string $clientsTable;
     private string $urlsTable;
     private string $pivotTable;
+    public const DEFAULT_FREQUENCY = 'manual';
+    private const FREQUENCIES = ['manual', 'hourly', 'twicedaily', 'daily', 'weekly'];
 
     public function __construct(wpdb $wpdb)
     {
@@ -81,7 +83,7 @@ final class ClientRepository
         return $client;
     }
 
-    public function create(string $name, string $status, string $notes): ?int
+    public function create(string $name, string $status, string $notes, string $frequency): ?int
     {
         $name = $this->sanitizeName($name);
         if ($name === '') {
@@ -91,6 +93,7 @@ final class ClientRepository
         $status = $this->sanitizeStatus($status);
         $notes = wp_kses_post($notes);
         $now = current_time('mysql');
+        $frequency = $this->sanitizeFrequency($frequency);
 
         $inserted = $this->wpdb->insert(
             $this->clientsTable,
@@ -98,10 +101,11 @@ final class ClientRepository
                 'name' => $name,
                 'status' => $status,
                 'notes' => $notes,
+                'crawl_frequency' => $frequency,
                 'created_at' => $now,
                 'updated_at' => $now,
             ],
-            ['%s', '%s', '%s', '%s', '%s']
+            ['%s', '%s', '%s', '%s', '%s', '%s']
         );
 
         if ($inserted === false) {
@@ -111,7 +115,7 @@ final class ClientRepository
         return (int) $this->wpdb->insert_id;
     }
 
-    public function update(int $id, string $name, string $status, string $notes): bool
+    public function update(int $id, string $name, string $status, string $notes, string $frequency): bool
     {
         $client = $this->find($id);
         if (! $client) {
@@ -126,6 +130,7 @@ final class ClientRepository
         $status = $this->sanitizeStatus($status);
         $notes = wp_kses_post($notes);
         $now = current_time('mysql');
+        $frequency = $this->sanitizeFrequency($frequency);
 
         $updated = $this->wpdb->update(
             $this->clientsTable,
@@ -133,10 +138,11 @@ final class ClientRepository
                 'name' => $name,
                 'status' => $status,
                 'notes' => $notes,
+                'crawl_frequency' => $frequency,
                 'updated_at' => $now,
             ],
             ['id' => $id],
-            ['%s', '%s', '%s', '%s'],
+            ['%s', '%s', '%s', '%s', '%s'],
             ['%d']
         );
 
@@ -257,7 +263,7 @@ final class ClientRepository
     }
 
     /**
-     * @return array{id:int,name:string,status:string,notes:string,created:string,updated:string,url_count:int,category_count:int}
+     * @return array{id:int,name:string,status:string,notes:string,created:string,updated:string,url_count:int,category_count:int,crawl_frequency:string}
      */
     private function mapClientRow(array $row): array
     {
@@ -270,6 +276,7 @@ final class ClientRepository
             'updated' => (string) $row['updated_at'],
             'url_count' => isset($row['url_count']) ? (int) $row['url_count'] : 0,
             'category_count' => isset($row['category_count']) ? (int) $row['category_count'] : 0,
+            'crawl_frequency' => $this->sanitizeFrequency((string) ($row['crawl_frequency'] ?? self::DEFAULT_FREQUENCY)),
         ];
     }
 
@@ -282,6 +289,20 @@ final class ClientRepository
     {
         $status = strtolower(trim($status));
         return in_array($status, ['active', 'inactive'], true) ? $status : 'active';
+    }
+
+    public function sanitizeFrequency(string $frequency): string
+    {
+        $frequency = strtolower(trim($frequency));
+        return in_array($frequency, self::FREQUENCIES, true) ? $frequency : self::DEFAULT_FREQUENCY;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function frequencyOptions(): array
+    {
+        return self::FREQUENCIES;
     }
 
     private function normalizeUrl(string $url): string

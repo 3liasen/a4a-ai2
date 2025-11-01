@@ -7,6 +7,15 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 if (! defined('HOUR_IN_SECONDS')) {
     define('HOUR_IN_SECONDS', 3600);
 }
+if (! defined('MINUTE_IN_SECONDS')) {
+    define('MINUTE_IN_SECONDS', 60);
+}
+if (! defined('DAY_IN_SECONDS')) {
+    define('DAY_IN_SECONDS', 86400);
+}
+if (! defined('WEEK_IN_SECONDS')) {
+    define('WEEK_IN_SECONDS', 7 * DAY_IN_SECONDS);
+}
 
 $GLOBALS['wp_options'] = $GLOBALS['wp_options'] ?? [];
 $GLOBALS['wp_actions'] = $GLOBALS['wp_actions'] ?? [];
@@ -55,17 +64,47 @@ if (! function_exists('delete_option')) {
 }
 
 if (! function_exists('wp_next_scheduled')) {
-    function wp_next_scheduled(string $hook)
+    function wp_next_scheduled(string $hook, array $args = [])
     {
-        return $GLOBALS['wp_cron_scheduled'][$hook] ?? false;
+        $key = md5(serialize($args));
+        return $GLOBALS['wp_cron_scheduled'][$hook][$key]['timestamp'] ?? false;
     }
 }
 
 if (! function_exists('wp_schedule_event')) {
     function wp_schedule_event(int $timestamp, string $recurrence, string $hook, array $args = []): bool
     {
-        $GLOBALS['wp_cron_scheduled'][$hook] = $timestamp;
+        $key = md5(serialize($args));
+        $GLOBALS['wp_cron_scheduled'][$hook][$key] = [
+            'timestamp' => $timestamp,
+            'schedule' => $recurrence,
+            'args' => $args,
+        ];
         return true;
+    }
+}
+
+if (! function_exists('wp_unschedule_event')) {
+    function wp_unschedule_event(int $timestamp, string $hook, array $args = []): bool
+    {
+        $key = md5(serialize($args));
+        if (isset($GLOBALS['wp_cron_scheduled'][$hook][$key]) && (int) $GLOBALS['wp_cron_scheduled'][$hook][$key]['timestamp'] === (int) $timestamp) {
+            unset($GLOBALS['wp_cron_scheduled'][$hook][$key]);
+            if (empty($GLOBALS['wp_cron_scheduled'][$hook])) {
+                unset($GLOBALS['wp_cron_scheduled'][$hook]);
+            }
+            return true;
+        }
+
+        return false;
+    }
+}
+
+if (! function_exists('wp_get_scheduled_event')) {
+    function wp_get_scheduled_event(string $hook, array $args = [])
+    {
+        $key = md5(serialize($args));
+        return $GLOBALS['wp_cron_scheduled'][$hook][$key] ?? null;
     }
 }
 

@@ -23,12 +23,15 @@ final class ExchangeRateUpdaterTest extends TestCase
         $updater->scheduleEvent();
 
         self::assertArrayHasKey('axs4all_ai_update_exchange_rate', $GLOBALS['wp_cron_scheduled']);
-        $scheduled = $GLOBALS['wp_cron_scheduled']['axs4all_ai_update_exchange_rate'];
+        $events = array_values($GLOBALS['wp_cron_scheduled']['axs4all_ai_update_exchange_rate']);
+        self::assertNotEmpty($events);
+        $scheduledEvent = $events[0];
         $now = time();
-        self::assertGreaterThanOrEqual($now + HOUR_IN_SECONDS, $scheduled);
+        self::assertGreaterThanOrEqual($now + HOUR_IN_SECONDS, $scheduledEvent['timestamp']);
 
         $updater->scheduleEvent();
-        self::assertSame($scheduled, $GLOBALS['wp_cron_scheduled']['axs4all_ai_update_exchange_rate']);
+        $eventsAfter = array_values($GLOBALS['wp_cron_scheduled']['axs4all_ai_update_exchange_rate']);
+        self::assertSame($scheduledEvent['timestamp'], $eventsAfter[0]['timestamp']);
     }
 
     public function testUpdateRateFetchesAndStoresLatestRate(): void

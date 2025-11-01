@@ -21,6 +21,7 @@ use Axs4allAi\Classification\ClassificationScheduler;
 use Axs4allAi\Classification\PromptRepository;
 use Axs4allAi\Category\CategoryRegistrar;
 use Axs4allAi\Category\CategoryRepository;
+use Axs4allAi\Crawl\ClientCrawlScheduler;
 use Axs4allAi\Crawl\CrawlRunner;
 use Axs4allAi\Crawl\CrawlScheduler;
 use Axs4allAi\Data\ClientRepository;
@@ -39,6 +40,7 @@ final class Plugin
     private OpenAiClient $aiClient;
     private ClassificationRunner $classificationRunner;
     private ClassificationScheduler $classificationScheduler;
+    private ClientCrawlScheduler $clientCrawlScheduler;
     private CrawlRunner $crawlRunner;
     private ClientRepository $clientRepository;
     private ExchangeRateUpdater $exchangeRateUpdater;
@@ -84,6 +86,11 @@ final class Plugin
             $this->categoryRepository
         );
         $this->crawlScheduler = new CrawlScheduler($this->queueRepository, $this->crawlRunner);
+        $this->clientCrawlScheduler = new ClientCrawlScheduler(
+            $this->clientRepository,
+            $this->queueRepository,
+            $this->categoryRepository
+        );
     }
 
     public function boot(): void
@@ -100,6 +107,7 @@ final class Plugin
         $this->categoryRegistrar->register();
         $this->registerAdminHooks();
         $this->crawlScheduler->register();
+        $this->clientCrawlScheduler->register();
         $this->classificationScheduler->register();
         $this->exchangeRateUpdater->register();
         $this->registerCliCommands();

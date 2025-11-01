@@ -8,7 +8,7 @@ use wpdb;
 
 final class Installer
 {
-    private const DB_VERSION = '1.2.1';
+    private const DB_VERSION = '1.3.0';
     private const OPTION_KEY = 'axs4all_ai_db_version';
 
     public static function activate(): void
@@ -87,6 +87,7 @@ final class Installer
             name VARCHAR(190) NOT NULL,
             status VARCHAR(32) NOT NULL DEFAULT 'active',
             notes LONGTEXT NULL,
+            crawl_frequency VARCHAR(32) NOT NULL DEFAULT 'manual',
             created_at DATETIME NOT NULL,
             updated_at DATETIME NOT NULL,
             PRIMARY KEY (id),

@@ -46,6 +46,9 @@ final class BackfillManagerTest extends TestCase
 
         self::assertNotEmpty($wpdb->queryLog);
         self::assertSame('UPDATE wp_axs4all_ai_queue SET crawl_subpages = 0 WHERE crawl_subpages IS NULL', $wpdb->queryLog[0]['query']);
+        self::assertSame('prepare', $wpdb->queryLog[1]['type']);
+        self::assertStringContainsString('UPDATE wp_axs4all_ai_clients SET crawl_frequency = %s', $wpdb->queryLog[1]['query']);
+        self::assertSame('query', $wpdb->queryLog[2]['type']);
 
         self::assertCount(4, $wpdb->updateLog);
 

@@ -70,6 +70,7 @@ final class ClientPage
                             <th><?php esc_html_e('Status', 'axs4all-ai'); ?></th>
                             <th><?php esc_html_e('URLs', 'axs4all-ai'); ?></th>
                             <th><?php esc_html_e('Categories', 'axs4all-ai'); ?></th>
+                            <th><?php esc_html_e('Schedule', 'axs4all-ai'); ?></th>
                             <th><?php esc_html_e('Actions', 'axs4all-ai'); ?></th>
                         </tr>
                         </thead>
@@ -77,7 +78,7 @@ final class ClientPage
                         <?php $rows = $this->clients->all(); ?>
                         <?php if (empty($rows)) : ?>
                             <tr>
-                                <td colspan="5"><?php esc_html_e('No clients created yet.', 'axs4all-ai'); ?></td>
+                                <td colspan="6"><?php esc_html_e('No clients created yet.', 'axs4all-ai'); ?></td>
                             </tr>
                         <?php else : ?>
                             <?php foreach ($rows as $row) : ?>
@@ -86,6 +87,7 @@ final class ClientPage
                                     <td><?php echo esc_html(ucfirst($row['status'])); ?></td>
                                     <td><?php echo esc_html((string) $row['url_count']); ?></td>
                                     <td><?php echo esc_html((string) $row['category_count']); ?></td>
+                                    <td><?php echo esc_html($this->formatFrequency($row['crawl_frequency'] ?? ClientRepository::DEFAULT_FREQUENCY)); ?></td>
                                     <td>
                                         <a class="button-link" href="<?php echo esc_url(add_query_arg(['page' => self::MENU_SLUG, 'edit_client' => $row['id']])); ?>">
                                             <?php esc_html_e('Edit', 'axs4all-ai'); ?>
@@ -134,6 +136,22 @@ final class ClientPage
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row"><label for="axs4all-ai-client-frequency"><?php esc_html_e('Schedule', 'axs4all-ai'); ?></label></th>
+                                <td>
+                                    <select name="client_frequency" id="axs4all-ai-client-frequency">
+                                        <?php
+                                        $currentFrequency = $client['crawl_frequency'] ?? ClientRepository::DEFAULT_FREQUENCY;
+                                        foreach ($this->frequencyChoices() as $value => $label) :
+                                        ?>
+                                            <option value="<?php echo esc_attr($value); ?>" <?php selected($currentFrequency, $value); ?>>
+                                                <?php echo esc_html($label); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <p class="description"><?php esc_html_e('Controls how often this client’s URLs are automatically queued for crawling.', 'axs4all-ai'); ?></p>
                                 </td>
                             </tr>
                             <tr>
@@ -256,18 +274,20 @@ final class ClientPage
         $name = isset($_POST['client_name']) ? (string) wp_unslash($_POST['client_name']) : '';
         $status = isset($_POST['client_status']) ? (string) wp_unslash($_POST['client_status']) : 'active';
         $notes = isset($_POST['client_notes']) ? (string) wp_unslash($_POST['client_notes']) : '';
+        $frequencyInput = isset($_POST['client_frequency']) ? (string) wp_unslash($_POST['client_frequency']) : ClientRepository::DEFAULT_FREQUENCY;
+        $frequency = $this->clients->sanitizeFrequency($frequencyInput);
 
         if ($name === '') {
             $this->redirectWithMessage('client_error', __('Client name is required.', 'axs4all-ai'));
         }
 
         if ($id > 0) {
-            $success = $this->clients->update($id, $name, $status, $notes);
+            $success = $this->clients->update($id, $name, $status, $notes, $frequency);
             $clientId = $id;
             $messageParam = $success ? 'client_message' : 'client_error';
             $message = $success ? __('Client updated.', 'axs4all-ai') : __('Failed to update client.', 'axs4all-ai');
         } else {
-            $clientId = $this->clients->create($name, $status, $notes);
+            $clientId = $this->clients->create($name, $status, $notes, $frequency);
             if (! $clientId) {
                 $this->redirectWithMessage('client_error', __('Failed to create client.', 'axs4all-ai'));
             }
@@ -339,6 +359,29 @@ final class ClientPage
         if ($error) {
             echo '<div class="notice notice-error"><p>' . esc_html($error) . '</p></div>';
         }
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function frequencyChoices(): array
+    {
+        return [
+            'manual' => __('Manual trigger only', 'axs4all-ai'),
+            'hourly' => __('Every hour', 'axs4all-ai'),
+            'twicedaily' => __('Every 12 hours', 'axs4all-ai'),
+            'daily' => __('Daily', 'axs4all-ai'),
+            'weekly' => __('Weekly', 'axs4all-ai'),
+        ];
+    }
+
+    private function formatFrequency(string $frequency): string
+    {
+        $choices = $this->frequencyChoices();
+        if (! isset($choices[$frequency])) {
+            $frequency = ClientRepository::DEFAULT_FREQUENCY;
+        }
+        return $choices[$frequency];
     }
 
     /**

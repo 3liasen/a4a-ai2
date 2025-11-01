@@ -18,6 +18,7 @@ final class ClientRepositoryTest extends TestCase
             'name' => 'Example Client',
             'status' => 'active',
             'notes' => '',
+            'crawl_frequency' => 'daily',
             'created_at' => '2024-01-01 00:00:00',
             'updated_at' => '2024-01-02 00:00:00',
         ];
@@ -48,6 +49,7 @@ final class ClientRepositoryTest extends TestCase
         self::assertCount(1, $client['urls']);
         self::assertTrue($client['urls'][0]['crawl_subpages']);
         self::assertContains(12, $client['categories']);
+        self::assertSame('daily', $client['crawl_frequency']);
     }
 
     public function testGetCategoryAssignmentsReturnsDecodedOverrides(): void
