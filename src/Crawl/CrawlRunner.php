@@ -53,14 +53,25 @@ final class CrawlRunner
             $queueId = (int) $item['id'];
             $url = (string) $item['source_url'];
             $category = trim((string) $item['category']);
+            $queueClientId = isset($item['client_id']) ? (int) $item['client_id'] : 0;
+            $queueCategoryId = isset($item['category_id']) ? (int) $item['category_id'] : 0;
             if ($category === '') {
                 $category = 'default';
             }
 
             error_log(sprintf('[axs4all-ai] Processing queue item #%d (%s).', $queueId, $url));
 
-            $client = $this->clients instanceof ClientRepository ? $this->clients->findByUrl($url) : null;
-            $clientId = isset($client['id']) ? (int) $client['id'] : null;
+            $client = null;
+            if ($queueClientId > 0 && $this->clients instanceof ClientRepository) {
+                $client = $this->clients->find($queueClientId);
+            }
+            if ($client === null && $this->clients instanceof ClientRepository) {
+                $client = $this->clients->findByUrl($url);
+            }
+            $clientId = $queueClientId > 0 ? $queueClientId : null;
+            if ($client !== null && isset($client['id'])) {
+                $clientId = (int) $client['id'];
+            }
 
             $html = $this->scraper->fetch($url);
             if ($html === null) {
@@ -78,7 +89,7 @@ final class CrawlRunner
             );
 
             if ($this->classificationQueue !== null && ! empty($snippets)) {
-                $assignments = $this->determineCategoryAssignments($category, $client);
+                $assignments = $this->determineCategoryAssignments($category, $client, $queueCategoryId);
                 if (empty($assignments)) {
                     error_log(sprintf('[axs4all-ai] No categories resolved for queue item #%d. Skipping classification.', $queueId));
                     continue;
@@ -139,9 +150,23 @@ final class CrawlRunner
     }
 
     /** @param array<string, mixed>|null $client */
-    private function determineCategoryAssignments(string $fallbackCategory, ?array $client): array
+    private function determineCategoryAssignments(string $fallbackCategory, ?array $client, ?int $queueCategoryId = null): array
     {
         $assignments = [];
+
+        if ($queueCategoryId !== null && $queueCategoryId > 0) {
+            $category = $this->resolveCategoryById($queueCategoryId);
+            if ($category !== null) {
+                $assignments[] = [
+                    'id' => (int) $category['id'],
+                    'name' => (string) $category['name'],
+                ];
+            }
+        }
+
+        if (! empty($assignments)) {
+            return $assignments;
+        }
 
         if ($client !== null && $this->clients instanceof ClientRepository) {
             $clientId = isset($client['id']) ? (int) $client['id'] : 0;

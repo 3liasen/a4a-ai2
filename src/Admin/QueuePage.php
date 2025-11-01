@@ -48,6 +48,8 @@ final class QueuePage
         $message = isset($_GET['message']) ? sanitize_text_field((string) $_GET['message']) : null;
         $recent = $this->repository->getRecent();
         $clientUrls = $this->gatherClientUrlRows();
+        $clientOptions = $this->getClientOptions();
+        $categoryOptions = $this->buildCategoryMap();
 
         ?>
         <div class="wrap">
@@ -70,11 +72,39 @@ final class QueuePage
                     </tr>
                     <tr>
                         <th scope="row">
+                            <label for="axs4all-ai-queue-client"><?php esc_html_e('Client', 'axs4all-ai'); ?></label>
+                        </th>
+                        <td>
+                            <select name="queue_client_id" id="axs4all-ai-queue-client">
+                                <option value="0"><?php esc_html_e('None (manual URL)', 'axs4all-ai'); ?></option>
+                                <?php foreach ($clientOptions as $clientId => $clientName) : ?>
+                                    <option value="<?php echo esc_attr((string) $clientId); ?>"><?php echo esc_html($clientName); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <p class="description"><?php esc_html_e('Associate the queue item with a configured client so downstream jobs know which URLs belong together.', 'axs4all-ai'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
                             <label for="axs4all-ai-queue-category"><?php esc_html_e('Category', 'axs4all-ai'); ?></label>
                         </th>
                         <td>
-                            <input type="text" class="regular-text" name="queue_category" id="axs4all-ai-queue-category" placeholder="<?php esc_attr_e('restaurant', 'axs4all-ai'); ?>">
-                            <p class="description"><?php esc_html_e('Category maps to extraction selectors and AI prompts.', 'axs4all-ai'); ?></p>
+                            <select name="queue_category_payload" id="axs4all-ai-queue-category">
+                                <option value="0"><?php esc_html_e('Use manual slug / default', 'axs4all-ai'); ?></option>
+                                <?php foreach ($categoryOptions as $categoryId => $categoryMeta) : ?>
+                                    <?php
+                                    $slug = $categoryMeta['value'];
+                                    $label = sprintf('%s (%s)', $categoryMeta['name'], $slug);
+                                    ?>
+                                    <option value="<?php echo esc_attr($categoryId . ':' . $slug); ?>"><?php echo esc_html($label); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <p class="description"><?php esc_html_e('Choose a category to attach to the crawl item. Leave on manual to fall back to the slug field or the default prompts.', 'axs4all-ai'); ?></p>
+                            <label for="axs4all-ai-queue-category-slug" style="display:block; margin-top:0.5rem;">
+                                <?php esc_html_e('Manual category slug (optional)', 'axs4all-ai'); ?>
+                            </label>
+                            <input type="text" class="regular-text" name="queue_category" id="axs4all-ai-queue-category-slug" placeholder="<?php esc_attr_e('restaurant', 'axs4all-ai'); ?>">
+                            <p class="description"><?php esc_html_e('Use this if you need a category that is not yet configured above. Leave empty to fall back to “default”.', 'axs4all-ai'); ?></p>
                         </td>
                     </tr>
                     <tr>
@@ -95,7 +125,9 @@ final class QueuePage
                 <thead>
                     <tr>
                         <th><?php esc_html_e('URL', 'axs4all-ai'); ?></th>
+                        <th><?php esc_html_e('Client', 'axs4all-ai'); ?></th>
                         <th><?php esc_html_e('Category', 'axs4all-ai'); ?></th>
+                        <th><?php esc_html_e('Subpages', 'axs4all-ai'); ?></th>
                         <th><?php esc_html_e('Status', 'axs4all-ai'); ?></th>
                         <th><?php esc_html_e('Priority', 'axs4all-ai'); ?></th>
                         <th><?php esc_html_e('Attempts', 'axs4all-ai'); ?></th>
@@ -107,13 +139,15 @@ final class QueuePage
                 <tbody>
                 <?php if (empty($recent)) : ?>
                     <tr>
-                        <td colspan="8"><?php esc_html_e('No queue items yet.', 'axs4all-ai'); ?></td>
+                        <td colspan="10"><?php esc_html_e('No queue items yet.', 'axs4all-ai'); ?></td>
                     </tr>
                 <?php else : ?>
                     <?php foreach ($recent as $item) : ?>
                         <tr>
                             <td><a href="<?php echo esc_url($item['source_url']); ?>" target="_blank" rel="noreferrer noopener"><?php echo esc_html($item['source_url']); ?></a></td>
-                            <td><?php echo esc_html($item['category']); ?></td>
+                            <td><?php echo esc_html($clientOptions[$item['client_id']] ?? '—'); ?></td>
+                            <td><?php echo esc_html($this->formatCategoryLabel($item, $categoryOptions)); ?></td>
+                            <td><?php echo ! empty($item['crawl_subpages']) ? esc_html__('Yes', 'axs4all-ai') : esc_html__('No', 'axs4all-ai'); ?></td>
                             <td><?php echo esc_html($item['status']); ?></td>
                             <td><?php echo esc_html((string) $item['priority']); ?></td>
                             <td><?php echo esc_html((string) $item['attempts']); ?></td>
@@ -167,16 +201,24 @@ final class QueuePage
                                     <input type="hidden" name="action" value="axs4all_ai_add_queue">
                                     <input type="hidden" name="queue_url" value="<?php echo esc_attr($row['url']); ?>">
                                     <input type="hidden" name="queue_priority" value="5">
-                                    <?php if (count($row['category_values']) > 1) : ?>
-                                        <select name="queue_category" style="max-width: 180px;">
-                                            <?php foreach ($row['category_options'] as $value => $label) : ?>
-                                                <option value="<?php echo esc_attr($value); ?>"><?php echo esc_html($label); ?></option>
+                                    <input type="hidden" name="queue_client_id" value="<?php echo esc_attr((string) $row['client_id']); ?>">
+                                    <?php if (count($row['category_choices']) > 1) : ?>
+                                        <select name="queue_category_payload" style="max-width: 220px;">
+                                            <?php foreach ($row['category_choices'] as $choice) : ?>
+                                                <?php $payload = $choice['id'] . ':' . $choice['slug']; ?>
+                                                <option value="<?php echo esc_attr($payload); ?>"><?php echo esc_html($choice['name'] . ' (' . $choice['slug'] . ')'); ?></option>
                                             <?php endforeach; ?>
                                         </select>
                                     <?php else : ?>
-                                        <input type="hidden" name="queue_category" value="<?php echo esc_attr($row['category_values'][0] ?? ''); ?>">
-                                        <?php if (! empty($row['categories'])) : ?>
-                                            <span><?php echo esc_html(implode(', ', $row['categories'])); ?></span>
+                                        <?php
+                                        $firstChoice = $row['category_choices'][0] ?? null;
+                                        if ($firstChoice !== null) :
+                                            $payload = $firstChoice['id'] . ':' . $firstChoice['slug'];
+                                        ?>
+                                            <input type="hidden" name="queue_category_payload" value="<?php echo esc_attr($payload); ?>">
+                                            <span><?php echo esc_html($firstChoice['name']); ?></span>
+                                        <?php else : ?>
+                                            <span><?php esc_html_e('No categories selected', 'axs4all-ai'); ?></span>
                                         <?php endif; ?>
                                     <?php endif; ?>
                                     <button type="submit" class="button"><?php esc_html_e('Queue URL', 'axs4all-ai'); ?></button>
@@ -200,10 +242,39 @@ final class QueuePage
         check_admin_referer('axs4all_ai_add_queue');
 
         $url = isset($_POST['queue_url']) ? (string) wp_unslash($_POST['queue_url']) : '';
-        $category = isset($_POST['queue_category']) ? (string) wp_unslash($_POST['queue_category']) : '';
+        $clientId = isset($_POST['queue_client_id']) ? (int) $_POST['queue_client_id'] : 0;
+        $payloadRaw = isset($_POST['queue_category_payload']) ? (string) wp_unslash($_POST['queue_category_payload']) : '';
+        $manualSlugInput = isset($_POST['queue_category']) ? (string) wp_unslash($_POST['queue_category']) : '';
+        [$payloadCategoryId, $payloadSlug] = $this->parseCategoryPayload($payloadRaw);
+        $manualSlug = $this->sanitizeCategorySlug($manualSlugInput);
+
+        $categoryOptions = $this->buildCategoryMap();
+        $categoryId = $payloadCategoryId;
+        $categorySlug = $payloadSlug;
+
+        if ($categoryId > 0 && $categorySlug === '' && isset($categoryOptions[$categoryId])) {
+            $categorySlug = $categoryOptions[$categoryId]['value'];
+        }
+
+        if ($categorySlug === '') {
+            $categorySlug = $manualSlug !== '' ? $manualSlug : 'default';
+        }
+
+        if ($categoryId === 0 && $categorySlug !== '' && $categorySlug !== 'default') {
+            $categoryId = $this->resolveCategoryIdFromSlug($categorySlug, $categoryOptions);
+        }
+
+        $priority = max(1, min(9, $priority));
         $priority = isset($_POST['queue_priority']) ? (int) $_POST['queue_priority'] : 5;
 
-        $success = $this->repository->enqueue($url, $category, $priority);
+        $success = $this->repository->enqueue(
+            $url,
+            $categorySlug,
+            $priority,
+            false,
+            $clientId > 0 ? $clientId : null,
+            $categoryId > 0 ? $categoryId : null
+        );
 
         $redirectUrl = add_query_arg(
             [
@@ -273,22 +344,30 @@ final class QueuePage
                 continue;
             }
 
-            $categoryLabels = [];
-            $categoryValues = [];
+            $categoryChoices = [];
             foreach ($client['categories'] ?? [] as $categoryId) {
-                if (isset($categoryMap[$categoryId])) {
-                    $categoryLabels[] = $categoryMap[$categoryId]['name'];
-                    $categoryValues[] = $categoryMap[$categoryId]['value'];
+                if (! isset($categoryMap[$categoryId])) {
+                    continue;
                 }
+
+                $categoryChoices[] = [
+                    'id' => (int) $categoryId,
+                    'name' => $categoryMap[$categoryId]['name'],
+                    'slug' => $categoryMap[$categoryId]['value'],
+                ];
             }
 
             foreach ($client['urls'] as $urlRow) {
                 $rows[] = [
                     'client' => $client['name'],
+                    'client_id' => (int) $client['id'],
                     'url' => $urlRow['url'],
-                    'categories' => $categoryLabels,
-                    'category_options' => ! empty($categoryLabels) ? array_combine($categoryValues, $categoryLabels) : [],
-                    'category_values' => $categoryValues,
+                    'crawl_subpages' => ! empty($urlRow['crawl_subpages']),
+                    'categories' => array_map(
+                        static fn(array $choice): string => $choice['name'],
+                        $categoryChoices
+                    ),
+                    'category_choices' => $categoryChoices,
                 ];
             }
         }
@@ -305,10 +384,7 @@ final class QueuePage
         $map = [];
         foreach ($all as $category) {
             $name = (string) $category['name'];
-            $value = sanitize_title($name);
-            if ($value === '') {
-                $value = sanitize_title_with_dashes($name);
-            }
+            $value = $this->generateSlugFromName($name);
             $map[(int) $category['id']] = [
                 'name' => $name,
                 'value' => $value,
@@ -317,5 +393,95 @@ final class QueuePage
 
         return $map;
     }
-}
 
+    /**
+     * @return array<int, string>
+     */
+    private function getClientOptions(): array
+    {
+        $options = [];
+        foreach ($this->clients->all() as $client) {
+            $options[(int) $client['id']] = (string) $client['name'];
+        }
+
+        asort($options, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return $options;
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     * @param array<int, array{name:string,value:string}> $categoryOptions
+     */
+    private function formatCategoryLabel(array $item, array $categoryOptions): string
+    {
+        $categoryId = isset($item['category_id']) ? (int) $item['category_id'] : 0;
+        if ($categoryId > 0 && isset($categoryOptions[$categoryId])) {
+            $meta = $categoryOptions[$categoryId];
+            return sprintf('%s (%s)', $meta['name'], $meta['value']);
+        }
+
+        $slug = isset($item['category']) ? (string) $item['category'] : '';
+        return $slug !== '' ? $slug : 'default';
+    }
+
+    /**
+     * @return array{0:int,1:string}
+     */
+    private function parseCategoryPayload(?string $payload): array
+    {
+        if (! is_string($payload) || $payload === '' || $payload === '0') {
+            return [0, ''];
+        }
+
+        $parts = explode(':', $payload, 2);
+        if (count($parts) === 2) {
+            $id = (int) $parts[0];
+            $slug = $this->sanitizeCategorySlug($parts[1]);
+            return [$id, $slug];
+        }
+
+        return [0, $this->sanitizeCategorySlug($payload)];
+    }
+
+    private function sanitizeCategorySlug(string $value): string
+    {
+        $value = sanitize_text_field($value);
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        $slug = sanitize_title($value);
+        if ($slug === '') {
+            $slug = sanitize_title_with_dashes($value);
+        }
+
+        return $slug;
+    }
+
+    /**
+     * @param array<int, array{name:string,value:string}> $categoryOptions
+     */
+    private function resolveCategoryIdFromSlug(string $slug, array $categoryOptions): int
+    {
+        $slug = $this->sanitizeCategorySlug($slug);
+        if ($slug === '') {
+            return 0;
+        }
+
+        foreach ($categoryOptions as $categoryId => $meta) {
+            if (strcasecmp($meta['value'], $slug) === 0) {
+                return (int) $categoryId;
+            }
+        }
+
+        return 0;
+    }
+
+    private function generateSlugFromName(string $name): string
+    {
+        $slug = $this->sanitizeCategorySlug($name);
+        return $slug !== '' ? $slug : 'default';
+    }
+}

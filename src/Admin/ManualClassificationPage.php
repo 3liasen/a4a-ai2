@@ -189,7 +189,14 @@ final class ManualClassificationPage
                 $this->redirect('manual_error', __('Crawl queue is not available.', 'axs4all-ai'));
             }
 
-            $queueId = $this->crawlQueue->enqueueWithId($normalizedUrl, $categorySlug, 5, $crawlSubpages);
+            $queueId = $this->crawlQueue->enqueueWithId(
+                $normalizedUrl,
+                $categorySlug,
+                5,
+                $crawlSubpages,
+                $clientId,
+                $categoryId
+            );
             if ($queueId === null) {
                 $this->redirect('manual_error', __('Failed to store the URL in the crawl queue.', 'axs4all-ai'));
             }

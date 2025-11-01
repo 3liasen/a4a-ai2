@@ -138,7 +138,10 @@ final class ClientCrawlScheduler
             return;
         }
 
-        $categorySlug = $this->determineCategorySlug($client);
+        $category = $this->determineCategoryContext($client);
+        $categorySlug = $category['slug'];
+        $categoryId = $category['id'];
+        $clientIdValue = isset($client['id']) ? (int) $client['id'] : 0;
         foreach ($urls as $row) {
             if (is_object($row)) {
                 $row = (array) $row;
@@ -151,7 +154,9 @@ final class ClientCrawlScheduler
                 (string) $row['url'],
                 $categorySlug,
                 5,
-                ! empty($row['crawl_subpages'])
+                ! empty($row['crawl_subpages']),
+                $clientIdValue,
+                $categoryId
             );
         }
     }
@@ -159,22 +164,31 @@ final class ClientCrawlScheduler
     /**
      * @param array<string, mixed>|object|null $client
      */
-    private function determineCategorySlug($client): string
+    private function determineCategoryContext($client): array
     {
         $client = $this->normalizeClient($client);
         $categories = $client['categories'] ?? [];
         if (empty($categories)) {
-            return 'default';
+            return [
+                'slug' => 'default',
+                'id' => 0,
+            ];
         }
 
         $categoryId = (int) $categories[0];
         if ($categoryId <= 0) {
-            return 'default';
+            return [
+                'slug' => 'default',
+                'id' => 0,
+            ];
         }
 
         $category = $this->categories->find($categoryId);
         if ($category === null) {
-            return 'default';
+            return [
+                'slug' => 'default',
+                'id' => 0,
+            ];
         }
 
         $slug = sanitize_title((string) $category['name']);
@@ -182,7 +196,12 @@ final class ClientCrawlScheduler
             $slug = sanitize_title_with_dashes((string) $category['name']);
         }
 
-        return $slug !== '' ? $slug : 'default';
+        $slug = $slug !== '' ? $slug : 'default';
+
+        return [
+            'slug' => $slug,
+            'id' => (int) $category['id'],
+        ];
     }
     /**
      * @param mixed $client

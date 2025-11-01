@@ -8,7 +8,7 @@ use wpdb;
 
 final class Installer
 {
-    private const DB_VERSION = '1.3.0';
+    private const DB_VERSION = '1.4.0';
     private const OPTION_KEY = 'axs4all_ai_db_version';
 
     public static function activate(): void
@@ -52,6 +52,8 @@ final class Installer
             priority TINYINT UNSIGNED NOT NULL DEFAULT 5,
             attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
             crawl_subpages TINYINT(1) NOT NULL DEFAULT 0,
+            client_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            category_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
             last_error TEXT NULL,
             last_attempted_at DATETIME NULL,
             created_at DATETIME NOT NULL,
@@ -59,7 +61,9 @@ final class Installer
             PRIMARY KEY  (id),
             UNIQUE KEY url_hash (url_hash),
             KEY status (status),
-            KEY category (category)
+            KEY category (category),
+            KEY client_id (client_id),
+            KEY category_id (category_id)
         ) {$charsetCollate};";
 
         $snapshotsSql = "CREATE TABLE {$snapshotsTable} (

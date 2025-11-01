@@ -16,7 +16,8 @@ final class BackfillManager
 
         $categoryMap = $this->buildCategoryMap($wpdb);
         if (! empty($categoryMap)) {
-            $this->backfillQueueCategories($wpdb, $categoryMap);
+            $this->backfillClassificationQueueCategories($wpdb, $categoryMap);
+            $this->backfillCrawlQueueCategories($wpdb, $categoryMap);
             $queueCategoryMap = $this->buildQueueCategoryMap($wpdb);
             if (! empty($queueCategoryMap)) {
                 $this->backfillResultCategories($wpdb, $queueCategoryMap);
@@ -25,7 +26,8 @@ final class BackfillManager
 
         $queueClientMap = $this->buildQueueClientMap($wpdb);
         if (! empty($queueClientMap)) {
-            $this->backfillQueueClients($wpdb, $queueClientMap);
+            $this->backfillClassificationQueueClients($wpdb, $queueClientMap);
+            $this->backfillCrawlQueueClients($wpdb, $queueClientMap);
             $this->backfillResultClients($wpdb, $queueClientMap);
         }
     }
@@ -78,7 +80,7 @@ final class BackfillManager
     /**
      * @param array<string, int> $categoryMap
      */
-    private function backfillQueueCategories(wpdb $wpdb, array $categoryMap): void
+    private function backfillClassificationQueueCategories(wpdb $wpdb, array $categoryMap): void
     {
         $table = $wpdb->prefix . 'axs4all_ai_classifications_queue';
         $rows = $wpdb->get_results(
@@ -98,6 +100,33 @@ final class BackfillManager
                 ['id' => (int) $row['id']],
                 ['%d'],
                 ['%d']
+            );
+        }
+    }
+
+    /**
+     * @param array<string, int> $categoryMap
+     */
+    private function backfillCrawlQueueCategories(wpdb $wpdb, array $categoryMap): void
+    {
+        $table = $wpdb->prefix . 'axs4all_ai_queue';
+        $rows = $wpdb->get_results(
+            "SELECT id, category FROM {$table} WHERE (category_id IS NULL OR category_id = 0) AND category <> ''",
+            ARRAY_A
+        ) ?: [];
+
+        foreach ($rows as $row) {
+            $categoryId = $this->findCategoryId($categoryMap, (string) $row['category']);
+            if ($categoryId === null) {
+                continue;
+            }
+
+            $wpdb->update(
+                $table,
+                ['category_id' => $categoryId],
+                ['id' => (int) $row['id'], 'category_id' => 0],
+                ['%d'],
+                ['%d', '%d']
             );
         }
     }
@@ -198,7 +227,7 @@ final class BackfillManager
     /**
      * @param array<int, int> $queueClientMap
      */
-    private function backfillQueueClients(wpdb $wpdb, array $queueClientMap): void
+    private function backfillClassificationQueueClients(wpdb $wpdb, array $queueClientMap): void
     {
         $table = $wpdb->prefix . 'axs4all_ai_classifications_queue';
         foreach ($queueClientMap as $queueId => $clientId) {
@@ -206,6 +235,23 @@ final class BackfillManager
                 $table,
                 ['client_id' => $clientId],
                 ['queue_id' => $queueId, 'client_id' => 0],
+                ['%d'],
+                ['%d', '%d']
+            );
+        }
+    }
+
+    /**
+     * @param array<int, int> $queueClientMap
+     */
+    private function backfillCrawlQueueClients(wpdb $wpdb, array $queueClientMap): void
+    {
+        $table = $wpdb->prefix . 'axs4all_ai_queue';
+        foreach ($queueClientMap as $queueId => $clientId) {
+            $wpdb->update(
+                $table,
+                ['client_id' => $clientId],
+                ['id' => $queueId, 'client_id' => 0],
                 ['%d'],
                 ['%d', '%d']
             );
