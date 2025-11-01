@@ -420,6 +420,18 @@ if (! function_exists('wp_remote_post')) {
     }
 }
 
+if (! function_exists('wp_mail')) {
+    function wp_mail(string $to, string $subject, string $message): bool
+    {
+        $GLOBALS['wp_mails'][] = [
+            'to' => $to,
+            'subject' => $subject,
+            'message' => $message,
+        ];
+
+        return true;
+    }
+}
 if (! function_exists('wp_remote_get')) {
     function wp_remote_get(string $url, array $args = [])
     {

@@ -48,7 +48,7 @@ final class DebugLogger
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function all(int $limit = self::DEFAULT_LIMIT): array
+    public function all(int $limit = self::DEFAULT_LIMIT, ?string $typeFilter = null): array
     {
         $limit = max(1, min(self::MAX_ENTRIES, $limit));
         $events = get_option(self::OPTION_KEY, []);
@@ -57,6 +57,13 @@ final class DebugLogger
         }
 
         $events = array_slice($events, -1 * $limit);
+        if ($typeFilter !== null && $typeFilter !== '') {
+            $typeFilter = strtolower($typeFilter);
+            $events = array_values(array_filter(
+                $events,
+                static fn(array $event): bool => isset($event['type']) && strtolower((string) $event['type']) === $typeFilter
+            ));
+        }
 
         return array_reverse($events);
     }

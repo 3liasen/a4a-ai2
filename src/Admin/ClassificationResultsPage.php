@@ -5,16 +5,19 @@ declare(strict_types=1);
 namespace Axs4allAi\Admin;
 
 use Axs4allAi\Classification\ClassificationQueueRepository;
+use Axs4allAi\Infrastructure\AlertManager;
 
 final class ClassificationResultsPage
 {
     private const MENU_SLUG = 'axs4all-ai-classifications';
 
     private ClassificationQueueRepository $repository;
+    private ?AlertManager $alerts;
 
-    public function __construct(ClassificationQueueRepository $repository)
+    public function __construct(ClassificationQueueRepository $repository, ?AlertManager $alerts = null)
     {
         $this->repository = $repository;
+        $this->alerts = $alerts;
     }
 
     public function registerMenu(): void
@@ -370,6 +373,9 @@ final class ClassificationResultsPage
         check_admin_referer('axs4all_ai_requeue_classification_' . $queueId);
 
         $success = $queueId > 0 ? $this->repository->requeue($queueId) : false;
+        if ($success && $this->alerts instanceof AlertManager) {
+            $this->alerts->recordQueueMetrics('classification', $this->repository->countQueue());
+        }
         $message = $success ? 'requeued' : 'requeue_error';
 
         $redirect = isset($_POST['redirect']) ? esc_url_raw((string) $_POST['redirect']) : '';

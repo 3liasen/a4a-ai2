@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Axs4allAi\Admin;
 
 use Axs4allAi\Category\CategoryRepository;
+use Axs4allAi\Infrastructure\AlertManager;
 
 final class CategoryPage
 {
@@ -15,10 +16,12 @@ final class CategoryPage
     private const NONCE_DELETE = 'axs4all_ai_category_delete';
 
     private CategoryRepository $repository;
+    private ?AlertManager $alerts;
 
-    public function __construct(CategoryRepository $repository)
+    public function __construct(CategoryRepository $repository, ?AlertManager $alerts = null)
     {
         $this->repository = $repository;
+        $this->alerts = $alerts;
     }
 
     public function registerMenu(): void
@@ -262,6 +265,9 @@ final class CategoryPage
 
         if ($id > 0) {
             $success = $this->repository->update($id, $name, $options, $meta);
+            if ($success) {
+                $this->logCategoryChange($name, $snippetLimit);
+            }
             $this->redirectWithMessage(
                 $success ? 'category_message' : 'category_error',
                 $success ? __('Category updated.', 'axs4all-ai') : __('Failed to update category.', 'axs4all-ai'),
@@ -269,11 +275,15 @@ final class CategoryPage
             );
         } else {
             $newId = $this->repository->create($name, $options, $meta);
+            if ($newId) {
+                $this->logCategoryChange($name, $snippetLimit);
+            }
             $this->redirectWithMessage(
                 $newId ? 'category_message' : 'category_error',
                 $newId ? __('Category created.', 'axs4all-ai') : __('Failed to create category.', 'axs4all-ai')
             );
         }
+
     }
 
     public function handleDelete(): void
@@ -294,6 +304,13 @@ final class CategoryPage
             $success ? 'category_message' : 'category_error',
             $success ? __('Category deleted.', 'axs4all-ai') : __('Unable to delete category.', 'axs4all-ai')
         );
+    }
+
+    private function logCategoryChange(string $name, ?int $snippetLimit): void
+    {
+        if ($this->alerts instanceof AlertManager) {
+            $this->alerts->logCategoryUpdate($name, $snippetLimit);
+        }
     }
 
     /**
@@ -344,3 +361,4 @@ final class CategoryPage
         }
     }
 }
+

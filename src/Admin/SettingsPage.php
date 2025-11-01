@@ -139,6 +139,39 @@ final class SettingsPage
             'axs4all-ai',
             'axs4all_ai_classification_section'
         );
+
+        add_settings_section(
+            'axs4all_ai_alerts_section',
+            __('Alerts & Monitoring', 'axs4all-ai'),
+            static function (): void {
+                echo '<p>' . esc_html__('Configure proactive alerts and notification endpoints.', 'axs4all-ai') . '</p>';
+            },
+            'axs4all-ai'
+        );
+
+        add_settings_field(
+            'axs4all_ai_alert_email',
+            __('Alert Email', 'axs4all-ai'),
+            [$this, 'renderAlertEmailField'],
+            'axs4all-ai',
+            'axs4all_ai_alerts_section'
+        );
+
+        add_settings_field(
+            'axs4all_ai_alert_slack',
+            __('Slack Webhook', 'axs4all-ai'),
+            [$this, 'renderAlertSlackField'],
+            'axs4all-ai',
+            'axs4all_ai_alerts_section'
+        );
+
+        add_settings_field(
+            'axs4all_ai_alert_queue_threshold',
+            __('Queue Threshold', 'axs4all-ai'),
+            [$this, 'renderAlertQueueThresholdField'],
+            'axs4all-ai',
+            'axs4all_ai_alerts_section'
+        );
     }
 
     public function registerActions(): void
@@ -207,6 +240,15 @@ final class SettingsPage
             ? (string) $input['exchange_rate_api_key']
             : ($existing['exchange_rate_api_key'] ?? '');
         $output['exchange_rate_api_key'] = $this->normalizeExchangeRateAccessKey($apiKeyInput);
+
+        $output['alert_email'] = sanitize_email((string) ($input['alert_email'] ?? ''));
+        if ($output['alert_email'] === '') {
+            $output['alert_email'] = '';
+        }
+
+        $output['alert_slack_webhook'] = esc_url_raw((string) ($input['alert_slack_webhook'] ?? ''));
+        $thresholdInput = isset($input['alert_queue_threshold']) ? (int) $input['alert_queue_threshold'] : ($existing['alert_queue_threshold'] ?? 0);
+        $output['alert_queue_threshold'] = max(0, $thresholdInput);
 
         return $output;
     }
@@ -523,3 +565,41 @@ final class SettingsPage
 }
 
 
+    public function renderAlertEmailField(): void
+    {
+        $options = get_option(self::OPTION_NAME, []);
+        $value = isset($options['alert_email']) ? (string) $options['alert_email'] : '';
+
+        printf(
+            '<input type="email" name="%1$s[alert_email]" value="%2$s" class="regular-text" placeholder="ops@example.com" />',
+            esc_attr(self::OPTION_NAME),
+            esc_attr($value)
+        );
+        echo '<p class="description">' . esc_html__('Email address that should receive critical alerts.', 'axs4all-ai') . '</p>';
+    }
+
+    public function renderAlertSlackField(): void
+    {
+        $options = get_option(self::OPTION_NAME, []);
+        $value = isset($options['alert_slack_webhook']) ? (string) $options['alert_slack_webhook'] : '';
+
+        printf(
+            '<input type="url" name="%1$s[alert_slack_webhook]" value="%2$s" class="regular-text" placeholder="https://hooks.slack.com/..." />',
+            esc_attr(self::OPTION_NAME),
+            esc_attr($value)
+        );
+        echo '<p class="description">' . esc_html__('Optional Slack Incoming Webhook URL for alerts.', 'axs4all-ai') . '</p>';
+    }
+
+    public function renderAlertQueueThresholdField(): void
+    {
+        $options = get_option(self::OPTION_NAME, []);
+        $value = isset($options['alert_queue_threshold']) ? (int) $options['alert_queue_threshold'] : 0;
+
+        printf(
+            '<input type="number" min="0" name="%1$s[alert_queue_threshold]" value="%2$s" class="small-text" />',
+            esc_attr(self::OPTION_NAME),
+            esc_attr((string) $value)
+        );
+        echo '<p class="description">' . esc_html__('Trigger alerts when pending jobs meet or exceed this number.', 'axs4all-ai') . '</p>';
+    }

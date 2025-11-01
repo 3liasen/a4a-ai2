@@ -47,4 +47,20 @@ final class DebugLoggerTest extends TestCase
         $entries = get_option('axs4all_ai_debug_events', []);
         self::assertSame([], $entries);
     }
+
+    public function testAllAllowsTypeFiltering(): void
+    {
+        update_option('axs4all_ai_debug_events', [
+            ['type' => 'alpha', 'message' => 'one'],
+            ['type' => 'beta', 'message' => 'two'],
+            ['type' => 'alpha', 'message' => 'three'],
+        ]);
+
+        $logger = new DebugLogger();
+        $filtered = $logger->all(10, 'alpha');
+
+        self::assertCount(2, $filtered);
+        self::assertSame('alpha', $filtered[0]['type']);
+        self::assertSame('alpha', $filtered[1]['type']);
+    }
 }

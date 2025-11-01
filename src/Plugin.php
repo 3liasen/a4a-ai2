@@ -31,6 +31,8 @@ use Axs4allAi\Data\SnapshotRepository;
 use Axs4allAi\Infrastructure\Installer;
 use Axs4allAi\Infrastructure\ExchangeRateUpdater;
 use Axs4allAi\Infrastructure\DebugLogger;
+use Axs4allAi\Infrastructure\AlertManager;
+use Axs4allAi\Infrastructure\HealthMonitor;
 
 final class Plugin
 {
@@ -49,6 +51,8 @@ final class Plugin
     private SnapshotRepository $snapshotRepository;
     private ExchangeRateUpdater $exchangeRateUpdater;
     private DebugLogger $debugLogger;
+    private AlertManager $alertManager;
+    private HealthMonitor $healthMonitor;
     private array $settings;
     private string $version;
     public function __construct()
@@ -65,6 +69,7 @@ final class Plugin
         $this->snapshotRepository = new SnapshotRepository($wpdb);
         $this->exchangeRateUpdater = new ExchangeRateUpdater();
         $this->debugLogger = new DebugLogger();
+        $this->alertManager = new AlertManager($this->debugLogger);
         $this->settings = $this->loadSettings();
         $apiKey = $this->resolveApiKey();
         $this->aiClient = new OpenAiClient(
@@ -104,6 +109,7 @@ final class Plugin
             $this->queueRepository,
             $this->categoryRepository
         );
+        $this->healthMonitor = new HealthMonitor($this->alertManager, $this->queueRepository, $this->classificationQueueRepository);
     }
 
     public function boot(): void
@@ -123,6 +129,7 @@ final class Plugin
         $this->clientCrawlScheduler->register();
         $this->classificationScheduler->register();
         $this->exchangeRateUpdater->register();
+        $this->healthMonitor->register();
         $this->registerCliCommands();
     }
 
@@ -141,9 +148,9 @@ final class Plugin
             $this->queueRepository
         );
         $billingPage = new BillingPage($this->classificationQueueRepository);
-        $categoryPage = new CategoryPage($this->categoryRepository);
+        $categoryPage = new CategoryPage($this->categoryRepository, $this->alertManager);
         $clientPage = new ClientPage($this->clientRepository, $this->categoryRepository);
-        $classificationPage = new ClassificationResultsPage($this->classificationQueueRepository);
+        $classificationPage = new ClassificationResultsPage($this->classificationQueueRepository, $this->alertManager);
         $footer = new Footer($this->version);
 
         add_action('admin_menu', [$settings, 'registerMenu']);

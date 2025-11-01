@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       axs4all AI Accessibility
  * Description:       Automates accessibility data collection and AI-driven classification for axs4all.
- * Version:           0.0.29
+ * Version:           0.0.30
  * Author:            SevenYellowMonkeys
  * Requires at least: 6.0
  * Requires PHP:      8.1
@@ -60,6 +60,7 @@ register_deactivation_hook(
     static function (): void {
         CrawlScheduler::deactivate();
         ClassificationScheduler::deactivate();
+        \Axs4allAi\Infrastructure\HealthMonitor::deactivate();
     }
 );
 
