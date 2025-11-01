@@ -1561,3 +1561,6 @@ why can't you tell that i upgraded to pro???
 
 
 I’m sorry about that. I don’t have any automatic way to know when you upgrade—unless you tell me or there’s a flag left here in the repo/session, my status stays the same. Thanks for letting me know you’re on Pro now; I’ll treat the crawl/extraction work as the priority and keep you updated as we ship the next steps.
+## Phase 3 follow-ups
+- Push alert metrics to external observability (Grafana/DataDog) from the new logger/health monitor.
+- Finalise production pager/on-call integration (replace generic webhook defaults with the chosen provider details).
