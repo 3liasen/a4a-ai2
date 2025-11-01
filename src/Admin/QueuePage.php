@@ -46,6 +46,7 @@ final class QueuePage
         add_action('admin_post_axs4all_ai_add_queue', [$this, 'handleAddRequest']);
         add_action('admin_post_axs4all_ai_delete_queue', [$this, 'handleDeleteRequest']);
         add_action('admin_post_axs4all_ai_run_crawl_now', [$this, 'handleRunCrawlNow']);
+        add_action('admin_post_axs4all_ai_requeue_queue', [$this, 'handleRequeueRequest']);
     }
 
     public function render(): void
@@ -62,12 +63,25 @@ final class QueuePage
         $snapshotMap = $this->snapshots instanceof SnapshotRepository
             ? $this->buildSnapshotMap($recent)
             : [];
+        $cronStatus = $this->gatherCronStatus();
 
         ?>
         <div class="wrap">
             <h1><?php esc_html_e('Crawl Queue', 'axs4all-ai'); ?></h1>
 
-            <?php $this->renderNotice($message); ?>
+           <?php $this->renderNotice($message); ?>
+
+            <div class="card" style="max-width:480px;margin-bottom:1.5rem;">
+                <h2><?php esc_html_e('Crawler Schedule', 'axs4all-ai'); ?></h2>
+                <p>
+                    <strong><?php esc_html_e('Next run:', 'axs4all-ai'); ?></strong>
+                    <?php echo esc_html($cronStatus['next'] ?? __('Not scheduled', 'axs4all-ai')); ?><br>
+                    <strong><?php esc_html_e('Last completed run:', 'axs4all-ai'); ?></strong>
+                    <?php echo esc_html($cronStatus['last'] ?? __('Unknown', 'axs4all-ai')); ?><br>
+                    <strong><?php esc_html_e('Pending items:', 'axs4all-ai'); ?></strong>
+                    <?php echo esc_html((string) ($cronStatus['pending'] ?? 0)); ?>
+                </p>
+            </div>
 
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:1rem;">
                 <?php wp_nonce_field('axs4all_ai_run_crawl'); ?>
@@ -171,11 +185,11 @@ final class QueuePage
                             <td><?php echo esc_html((string) $item['priority']); ?></td>
                             <td><?php echo esc_html((string) $item['attempts']); ?></td>
                             <td><?php echo esc_html($item['created_at']); ?></td>
-                            <td><?php echo esc_html($item['updated_at']); ?></td>
-                            <td>
-                                <?php
-                                $snapshot = $snapshotMap[$item['id']] ?? null;
-                                if ($snapshot === null) {
+                        <td><?php echo esc_html($item['updated_at']); ?></td>
+                        <td>
+                            <?php
+                            $snapshot = $snapshotMap[$item['id']] ?? null;
+                            if ($snapshot === null) {
                                     echo '&mdash;';
                                 } else {
                                     $snapshotUrl = add_query_arg(
@@ -192,17 +206,25 @@ final class QueuePage
                                     );
                                 }
                                 ?>
-                            </td>
-                            <td>
-                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('<?php echo esc_js(__('Remove this queue item?', 'axs4all-ai')); ?>');">
+                        </td>
+                        <td>
+                                <?php if ($item['status'] === 'failed') : ?>
+                                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;">
+                                        <?php wp_nonce_field('axs4all_ai_requeue_queue_' . (int) $item['id']); ?>
+                                        <input type="hidden" name="action" value="axs4all_ai_requeue_queue">
+                                        <input type="hidden" name="queue_id" value="<?php echo esc_attr((string) $item['id']); ?>">
+                                        <button type="submit" class="button button-secondary"><?php esc_html_e('Requeue', 'axs4all-ai'); ?></button>
+                                    </form>
+                                <?php endif; ?>
+                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('<?php echo esc_js(__('Remove this queue item?', 'axs4all-ai')); ?>');" style="display:inline;">
                                     <?php wp_nonce_field('axs4all_ai_delete_queue_' . (int) $item['id']); ?>
                                     <input type="hidden" name="action" value="axs4all_ai_delete_queue">
                                     <input type="hidden" name="queue_id" value="<?php echo esc_attr((string) $item['id']); ?>">
                                     <button type="submit" class="button button-link-delete"><?php esc_html_e('Delete', 'axs4all-ai'); ?></button>
                                 </form>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
                 <?php endif; ?>
                 </tbody>
             </table>
@@ -355,6 +377,29 @@ final class QueuePage
         exit;
     }
 
+    public function handleRequeueRequest(): void
+    {
+        if (! current_user_can('manage_options')) {
+            wp_die(__('You are not allowed to manage the crawl queue.', 'axs4all-ai'));
+        }
+
+        $id = isset($_POST['queue_id']) ? (int) $_POST['queue_id'] : 0;
+        check_admin_referer('axs4all_ai_requeue_queue_' . $id);
+
+        $success = $id > 0 ? $this->repository->requeue($id) : false;
+
+        $redirectUrl = add_query_arg(
+            [
+                'page' => 'axs4all-ai-queue',
+                'message' => $success ? 'requeued' : 'requeue_error',
+            ],
+            admin_url('admin.php')
+        );
+
+        wp_safe_redirect($redirectUrl);
+        exit;
+    }
+
     public function handleRunCrawlNow(): void
     {
         if (! current_user_can('manage_options')) {
@@ -384,6 +429,43 @@ final class QueuePage
         exit;
     }
 
+    /**
+     * @return array{next:string,last:string,pending:int}
+     */
+    private function gatherCronStatus(): array
+    {
+        $nextTimestamp = wp_next_scheduled('axs4all_ai_process_queue');
+        $next = $nextTimestamp ? $this->formatTimestamp((int) $nextTimestamp) : __('Not scheduled', 'axs4all-ai');
+
+        $lastRaw = get_option('axs4all_ai_last_crawl', '');
+        if (is_string($lastRaw) && $lastRaw !== '') {
+            $last = $this->formatUtcString($lastRaw);
+        } else {
+            $last = __('Never', 'axs4all-ai');
+        }
+
+        return [
+            'next' => $next,
+            'last' => $last,
+            'pending' => $this->repository->countPending(),
+        ];
+    }
+
+    private function formatTimestamp(int $timestamp): string
+    {
+        return gmdate('Y-m-d H:i:s', $timestamp) . ' UTC';
+    }
+
+    private function formatUtcString(string $value): string
+    {
+        $time = strtotime($value . ' UTC');
+        if ($time === false) {
+            return $value;
+        }
+
+        return $this->formatTimestamp($time);
+    }
+
     private function renderNotice(?string $message): void
     {
         if ($message === 'added') {
@@ -398,6 +480,10 @@ final class QueuePage
             echo '<div class="notice notice-success"><p>' . esc_html__('Crawler triggered. Check the log for progress.', 'axs4all-ai') . '</p></div>';
         } elseif ($message === 'crawl_error') {
             echo '<div class="notice notice-error"><p>' . esc_html__('Unable to trigger crawler. Please check logs and try again.', 'axs4all-ai') . '</p></div>';
+        } elseif ($message === 'requeued') {
+            echo '<div class="notice notice-success"><p>' . esc_html__('Queue item requeued for processing.', 'axs4all-ai') . '</p></div>';
+        } elseif ($message === 'requeue_error') {
+            echo '<div class="notice notice-error"><p>' . esc_html__('Unable to requeue item. Please try again.', 'axs4all-ai') . '</p></div>';
         }
     }
 

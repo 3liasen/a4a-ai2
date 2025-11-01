@@ -53,4 +53,22 @@ final class QueueRepositoryTest extends TestCase
 
         self::assertFalse($repository->enqueue('   ', 'default'));
     }
+
+    public function testRequeueResetsStatusAndAttempts(): void
+    {
+        $wpdb = new \wpdb();
+        $repository = new QueueRepository($wpdb);
+
+        $result = $repository->requeue(42);
+
+        self::assertTrue($result);
+        self::assertNotEmpty($wpdb->updateLog);
+        $update = $wpdb->updateLog[0];
+        self::assertSame('wp_axs4all_ai_queue', $update['table']);
+        self::assertSame('pending', $update['data']['status']);
+        self::assertSame(0, $update['data']['attempts']);
+        self::assertNull($update['data']['last_error']);
+        self::assertNull($update['data']['last_attempted_at']);
+        self::assertSame(['id' => 42], $update['where']);
+    }
 }

@@ -163,6 +163,30 @@ final class QueueRepository
         return (int) $this->wpdb->get_var($sql);
     }
 
+    public function requeue(int $id): bool
+    {
+        if ($id <= 0) {
+            return false;
+        }
+
+        $now = current_time('mysql');
+        $updated = $this->wpdb->update(
+            $this->table,
+            [
+                'status' => 'pending',
+                'attempts' => 0,
+                'last_error' => null,
+                'last_attempted_at' => null,
+                'updated_at' => $now,
+            ],
+            ['id' => $id],
+            ['%s', '%d', '%s', '%s', '%s'],
+            ['%d']
+        );
+
+        return $updated !== false;
+    }
+
     public function delete(int $id): bool
     {
         if ($id <= 0) {

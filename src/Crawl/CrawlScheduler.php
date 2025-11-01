@@ -56,6 +56,7 @@ final class CrawlScheduler
     public function processCron(): void
     {
         $this->runner->run();
+        update_option('axs4all_ai_last_crawl', current_time('mysql', true));
     }
 
     /**
