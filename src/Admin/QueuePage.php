@@ -37,6 +37,7 @@ final class QueuePage
     {
         add_action('admin_post_axs4all_ai_add_queue', [$this, 'handleAddRequest']);
         add_action('admin_post_axs4all_ai_delete_queue', [$this, 'handleDeleteRequest']);
+        add_action('admin_post_axs4all_ai_run_crawl_now', [$this, 'handleRunCrawlNow']);
     }
 
     public function render(): void
@@ -56,6 +57,12 @@ final class QueuePage
             <h1><?php esc_html_e('Crawl Queue', 'axs4all-ai'); ?></h1>
 
             <?php $this->renderNotice($message); ?>
+
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:1rem;">
+                <?php wp_nonce_field('axs4all_ai_run_crawl'); ?>
+                <input type="hidden" name="action" value="axs4all_ai_run_crawl_now" />
+                <?php submit_button(__('Run Crawl Now', 'axs4all-ai'), 'secondary', 'submit', false); ?>
+            </form>
 
             <h2><?php esc_html_e('Add URL to Queue', 'axs4all-ai'); ?></h2>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
@@ -267,14 +274,15 @@ final class QueuePage
             $categoryId = $this->resolveCategoryIdFromSlug($categorySlug, $categoryOptions);
         }
 
-        $priority = max(1, min(9, $priority));
         $priority = isset($_POST['queue_priority']) ? (int) $_POST['queue_priority'] : 5;
+        $priority = max(1, min(9, $priority));
+        $crawlSubpages = ! empty($_POST['queue_crawl_subpages']);
 
         $success = $this->repository->enqueue(
             $url,
             $categorySlug,
             $priority,
-            false,
+            $crawlSubpages,
             $clientId > 0 ? $clientId : null,
             $categoryId > 0 ? $categoryId : null
         );
@@ -314,6 +322,35 @@ final class QueuePage
         exit;
     }
 
+    public function handleRunCrawlNow(): void
+    {
+        if (! current_user_can('manage_options')) {
+            wp_die(__('You are not allowed to run the crawler.', 'axs4all-ai'));
+        }
+
+        check_admin_referer('axs4all_ai_run_crawl');
+
+        $message = 'crawl_error';
+        try {
+            do_action('axs4all_ai_process_queue');
+            $message = 'crawl_started';
+        } catch (\Throwable $exception) {
+            error_log('[axs4all-ai] Crawl run error: ' . $exception->getMessage());
+            $message = 'crawl_error';
+        }
+
+        $redirectUrl = add_query_arg(
+            [
+                'page' => 'axs4all-ai-queue',
+                'message' => $message,
+            ],
+            admin_url('admin.php')
+        );
+
+        wp_safe_redirect($redirectUrl);
+        exit;
+    }
+
     private function renderNotice(?string $message): void
     {
         if ($message === 'added') {
@@ -324,6 +361,10 @@ final class QueuePage
             echo '<div class="notice notice-success"><p>' . esc_html__('Queue item deleted.', 'axs4all-ai') . '</p></div>';
         } elseif ($message === 'delete_error') {
             echo '<div class="notice notice-error"><p>' . esc_html__('Unable to delete queue item. Please try again.', 'axs4all-ai') . '</p></div>';
+        } elseif ($message === 'crawl_started') {
+            echo '<div class="notice notice-success"><p>' . esc_html__('Crawler triggered. Check the log for progress.', 'axs4all-ai') . '</p></div>';
+        } elseif ($message === 'crawl_error') {
+            echo '<div class="notice notice-error"><p>' . esc_html__('Unable to trigger crawler. Please check logs and try again.', 'axs4all-ai') . '</p></div>';
         }
     }
 
@@ -488,4 +529,5 @@ final class QueuePage
         return $slug !== '' ? $slug : 'default';
     }
 }
+
 

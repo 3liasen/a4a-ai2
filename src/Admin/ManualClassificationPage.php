@@ -161,7 +161,7 @@ final class ManualClassificationPage
 
         $content = isset($_POST['manual_content']) ? trim((string) wp_unslash($_POST['manual_content'])) : '';
         $categorySlug = isset($_POST['manual_category']) ? sanitize_title((string) wp_unslash($_POST['manual_category'])) : '';
-        $clientId = isset($_POST['manual_client']) ? (int) $_POST['manual_client'] : 0;
+        $clientIdInput = isset($_POST['manual_client']) ? (int) $_POST['manual_client'] : 0;
         $url = isset($_POST['manual_url']) ? trim((string) wp_unslash($_POST['manual_url'])) : '';
         $crawlSubpages = ! empty($_POST['manual_crawl_subpages']);
         $runNow = ! empty($_POST['manual_run_now']);
@@ -176,9 +176,10 @@ final class ManualClassificationPage
 
         $prompt = $this->prompts->getActiveTemplate($categorySlug);
         $categoryId = $this->matchCategoryId($categorySlug);
-        $clientId = $clientId > 0 ? $clientId : null;
+        $clientId = $clientIdInput > 0 ? $clientIdInput : null;
         $queueId = 0;
         $contentUrl = '';
+        $clientUrl = $this->resolveClientUrl($clientIdInput);
 
         if ($url !== '') {
             $normalizedUrl = esc_url_raw($url);
@@ -203,6 +204,8 @@ final class ManualClassificationPage
             }
 
             $contentUrl = $normalizedUrl;
+        } elseif ($clientUrl !== '') {
+            $contentUrl = $clientUrl;
         }
 
         $jobId = $this->classificationQueue->enqueue(
@@ -307,5 +310,22 @@ final class ManualClassificationPage
 
         wp_safe_redirect($url);
         exit;
+    }
+
+    private function resolveClientUrl(int $clientId): string
+    {
+        if ($clientId <= 0 || ! $this->clients instanceof ClientRepository) {
+            return '';
+        }
+
+        $client = $this->clients->find($clientId);
+        if ($client === null || empty($client['urls'])) {
+            return '';
+        }
+
+        $firstUrl = $client['urls'][0]['url'] ?? '';
+        $normalized = esc_url_raw((string) $firstUrl);
+
+        return is_string($normalized) ? $normalized : '';
     }
 }
