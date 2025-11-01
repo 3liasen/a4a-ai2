@@ -36,7 +36,7 @@ final class ClientCrawlScheduler
     public function register(): void
     {
         add_filter('cron_schedules', [$this, 'registerIntervals']);
-        add_action('init', [$this, 'syncSchedules']);
+        add_action('init', [$this, 'syncSchedules'], 10, 0);
         add_action(self::HOOK, [$this, 'handleCron'], 10, 1);
     }
 
@@ -62,10 +62,11 @@ final class ClientCrawlScheduler
     }
 
     /**
-     * @param array<string, mixed> $client
+     * @param array<string, mixed>|object|null $client
      */
-    private function applySchedule(array $client): void
+    private function applySchedule($client): void
     {
+        $client = $this->normalizeClient($client);
         $clientId = (int) ($client['id'] ?? 0);
         if ($clientId <= 0) {
             return;
@@ -88,14 +89,16 @@ final class ClientCrawlScheduler
         $event = function_exists('wp_get_scheduled_event')
             ? wp_get_scheduled_event(self::HOOK, [$clientId])
             : null;
-        $existingSchedule = is_array($event) && isset($event['schedule']) ? (string) $event['schedule'] : null;
+        $existingSchedule = is_array($event) && isset($event['schedule']) ? (string) $event['schedule'] : (is_object($event) && isset($event->schedule) ? (string) $event->schedule : null);
 
         if ($existingSchedule === $config['schedule'] && $event !== null) {
             return;
         }
 
         if ($event !== null) {
-            $timestamp = isset($event['timestamp']) ? (int) $event['timestamp'] : wp_next_scheduled(self::HOOK, [$clientId]);
+            $timestamp = isset($event['timestamp'])
+                ? (int) $event['timestamp']
+                : (is_object($event) && isset($event->timestamp) ? (int) $event->timestamp : wp_next_scheduled(self::HOOK, [$clientId]));
             if ($timestamp) {
                 wp_unschedule_event($timestamp, self::HOOK, [$clientId]);
             }
@@ -120,8 +123,9 @@ final class ClientCrawlScheduler
 
     public function handleCron(int $clientId): void
     {
-        $client = $this->clients->find($clientId);
-        if ($client === null || ($client['status'] ?? 'active') !== 'active') {
+        $clientData = $this->clients->find($clientId);
+        $client = $this->normalizeClient($clientData);
+        if (empty($client) || ($client['status'] ?? 'active') !== 'active') {
             $this->clearSchedule($clientId);
             return;
         }
@@ -133,6 +137,9 @@ final class ClientCrawlScheduler
 
         $categorySlug = $this->determineCategorySlug($client);
         foreach ($urls as $row) {
+            if (is_object($row)) {
+                $row = (array) $row;
+            }
             if (empty($row['url'])) {
                 continue;
             }
@@ -147,10 +154,11 @@ final class ClientCrawlScheduler
     }
 
     /**
-     * @param array<string, mixed> $client
+     * @param array<string, mixed>|object|null $client
      */
-    private function determineCategorySlug(array $client): string
+    private function determineCategorySlug($client): string
     {
+        $client = $this->normalizeClient($client);
         $categories = $client['categories'] ?? [];
         if (empty($categories)) {
             return 'default';
@@ -172,5 +180,17 @@ final class ClientCrawlScheduler
         }
 
         return $slug !== '' ? $slug : 'default';
+    }
+    /**
+     * @param mixed $client
+     * @return array<string, mixed>
+     */
+    private function normalizeClient($client): array
+    {
+        if (is_object($client)) {
+            $client = (array) $client;
+        }
+
+        return is_array($client) ? $client : [];
     }
 }
