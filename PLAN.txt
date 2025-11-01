@@ -1,0 +1,141 @@
+AI-Driven Accessibility Data Classification WordPress Plugin Plan
+================================================================
+
+Project Overview
+----------------
+Goal: Deliver a WordPress plugin for axs4all that automates accessibility data collection, AI-driven yes/no classification, and exposes results through an AdminLTE-powered admin interface with strict versioning and configurability.
+
+Core Components:
+1. Data Acquisition (crawler, scraper, extraction rules)
+2. AI Classification Engine (prompt templates, model interface)
+3. Production Service Layer (API, caching, logging)
+4. WordPress Integration (admin UI, cron, storage, versioning)
+
+Assumptions & Dependencies
+- Plugin runs on PHP 8.1+ with Composer support for dependencies like Guzzle/DomCrawler.
+- AI inference leverages OpenAI-compatible API via HTTPS.
+- External crawling runs within WP environment using wp-cron or CLI tasks with rate limiting to respect robots.txt.
+- Accessible storage: MySQL (via WP database), optional object cache (Redis/Memcached) if present.
+- AdminLTE assets bundled locally or loaded via CDN with proper licensing.
+- Version file (e.g., plugin-root/version.php) governs semantic versioning increments.
+
+Phase 0 – Project Setup
+- Define repository structure: plugin base folder, src/, includes/, admin/, assets/, templates/.
+- Configure Composer autoloading, linting (PHP_CodeSniffer), basic PHPUnit scaffold.
+- Establish environment configuration: .env-style file (non-committed) for API keys, caching toggles.
+- Scaffold secure settings page in admin for managing OpenAI credentials (stored via wp_options with encryption helper if available).
+- Draft version.php with initial v0.0.1 value and helper to read/update version.
+
+Phase 1 – Data Acquisition Layer
+1. Crawler Module
+   - Implement queue-backed URL discovery (custom table `axs4all_queue` with status fields).
+   - Integrate wp-cron/CLI command to process queue respecting robots.txt, rate limits, and domain throttling.
+   - Seed queue via admin upload (CSV of seed URLs) and manual entry UI.
+2. Scraper Module
+   - Fetch HTML using Guzzle with retries, user-agent rotation, timeout handling.
+   - Store raw HTML snapshots compressed (optional) for auditing in custom post type or dedicated table.
+3. Extraction Logic
+   - Define configurable CSS/XPath selector sets saved per business category (restaurants/hotels/etc.).
+   - Build parser service leveraging Symfony DomCrawler to extract target text blocks.
+   - Implement heuristics to normalize whitespace, language detection, and text length thresholds.
+4. Data Pipeline Orchestration
+   - Assemble pipeline class that moves URL -> HTML -> extracted text -> classification queue.
+   - Include detailed error handling and logging (WP logging abstraction).
+
+Phase 2 – AI Classification Engine
+1. Prompt Template Management
+   - Create template registry storing few-shot examples and instructions per category.
+   - Provide admin UI to edit prompts with validation for required placeholders.
+2. AI Client
+   - Implement service wrapping OpenAI Chat Completions (temperature ~0, max tokens defined).
+   - Add retry/backoff, request/response logging with PII stripping.
+3. Classification Workflow
+   - Build job runner that sends extracted text to AI, parses strict “yes”/“no” output.
+   - Capture confidence/metadata (response time, tokens) for reporting.
+4. Testing & Evaluation
+   - Write unit/integration tests with mocked AI responses.
+   - Provide CLI to batch reclassify data when prompts change.
+
+Phase 3 – Production Service Architecture
+1. Internal API
+   - Expose REST endpoints (WP REST API) for retrieving classification results and triggering reprocessing.
+   - Secure endpoints via WP nonce/auth keys and optional API tokens.
+2. Caching Strategy
+   - Cache classification results keyed by URL hash; invalidate on manual refresh or detected content change.
+   - Utilize WP transients or external object cache with fallback.
+3. Logging & Audit Trail
+   - Implement centralized logger writing to custom table `axs4all_logs` with filters in admin UI.
+   - Log crawler events, AI calls, admin actions.
+4. Version Management
+   - Automate version bump helper called on deployment (CLI command) to increment version.php.
+
+Phase 4 – AdminLTE Interface & UX
+1. Admin Dashboard
+   - Integrate AdminLTE layout within WP admin page (enqueue assets, avoid conflicts).
+   - Dashboard widgets: crawler status, pending classifications, error rates.
+2. Configuration Panels
+   - Pages for API credentials, crawling rules, selector management, prompt templates, caching controls.
+   - Provide live validation (AJAX) for prompt syntax and selectors.
+3. Data Review Tools
+   - Result tables showing URL, extracted snippet, AI decision; allow manual override with audit logging.
+   - Bulk actions for re-crawl, re-classify, cache flush.
+4. Theming & Customization
+   - Settings to adjust AdminLTE color scheme, button/icon palette with preview.
+
+Phase 5 – Deployment & Maintenance
+1. Packaging
+   - Build script to bundle plugin (Composer install --no-dev, asset compilation).
+   - Document install steps and environment requirements.
+2. Monitoring & Alerts
+   - Hook into WP-Cron health checks; optional email/Slack notifications for failures.
+3. Documentation
+   - Create README, admin user guide, developer setup guide.
+   - Include data governance notes (robots.txt compliance, rate limiting, privacy).
+4. Roadmap Extensions
+   - Multi-language prompt support, additional accessibility criteria, third-party integrations.
+
+Risk Mitigation Highlights
+- Linguistic variance: maintain curated example library, schedule periodic review of misclassifications.
+- Output consistency: enforce parser validation; fail job if output not “yes/no”.
+- Scalability: limit concurrent crawls, offload heavy tasks to WP-CLI or external worker if needed.
+
+Immediate Next Actions
+1. Validate assumptions with stakeholders (hosting capabilities, AI provider choice, availability of Composer/PHP 8.1).
+2. Confirm legal/compliance requirements for scraping, storage, and robots.txt adherence.
+3. Inventory existing infrastructure (cron availability, caching layer, OpenAI credentials) and document constraints.
+4. Kick off Phase 0 by scaffolding plugin folder structure and Composer setup once prerequisites are confirmed.
+
+Progress Tracker
+- Immediate Next Actions:
+  * (x) Validate environment and provider assumptions.
+  * (x) Confirm legal/compliance requirements.
+  * (x) Inventory infrastructure and document constraints.
+-  * (x) Phase 0 scaffolding ready to start.
+- Phase 0 – Project Setup: (in progress)
+  * (x) Create plugin folder structure (root plugin files with src/, admin/, assets/, templates/ directories).
+  * (x) Add plugin bootstrap file and version registry.
+  * (x) Initialize Composer configuration and dev tooling stubs.
+  * (x) Scaffold admin settings page shell for OpenAI credentials.
+  * (x) Configure environment handling (.env loader, secret storage strategy).
+  * (x) Document developer setup instructions.
+- Phase 0 – Project Setup: (complete)
+- Phase 1 – Data Acquisition Layer: (complete)
+  * (x) Finalize queue schema and crawling workflow design.
+  * (x) Implement queue persistence layer (DB schema + models).
+  * (x) Build admin tools for seeding/managing crawl targets.
+  * (x) Implement crawler execution via WP-Cron/WP-CLI.
+  * (x) Implement scraping & extraction stubs with logging.
+- Phase 2 - AI Classification Engine: ( )
+  * (x) Implement database migrations for prompt templates and classification records.
+  * (x) Build prompt template repository and admin management tooling.
+  * (x) Implement classification queue repository and CLI runner integration.
+  * (x) Add automated classification scheduler (cron + CLI runner command).
+  * (x) Add operational controls for model, timeout, batch size, and retries.
+- Phase 3 - Production Service Architecture: ( )
+- Phase 4 – AdminLTE Interface & UX: ( )
+- Phase 5 – Deployment & Maintenance: ( )
+
+Infrastructure Notes
+- Cron: WP-Cron available; assess need for system cron later for heavy workloads.
+- Caching: none currently; plan for optional integration but use WP transients fallback.
+- AI Credentials: OpenAI keys pending; prioritize creating secure settings interface in Phase 0.
