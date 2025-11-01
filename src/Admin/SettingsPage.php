@@ -11,16 +11,24 @@ final class SettingsPage
     private const OPTION_GROUP = 'axs4all_ai_settings_group';
     private const OPTION_NAME = 'axs4all_ai_settings';
 
+    private string $parentSlug;
+    private string $menuSlug;
+
+    public function __construct(string $parentSlug = 'axs4all-ai', string $menuSlug = 'axs4all-ai-settings')
+    {
+        $this->parentSlug = $parentSlug;
+        $this->menuSlug = $menuSlug;
+    }
+
     public function registerMenu(): void
     {
-        add_menu_page(
-            __('axs4all AI', 'axs4all-ai'),
-            __('axs4all AI', 'axs4all-ai'),
+        add_submenu_page(
+            $this->parentSlug,
+            __('Settings', 'axs4all-ai'),
+            __('Settings', 'axs4all-ai'),
             'manage_options',
-            'axs4all-ai',
-            [$this, 'render'],
-            'dashicons-universal-access-alt',
-            56
+            $this->menuSlug,
+            [$this, 'render']
         );
     }
 
@@ -40,14 +48,14 @@ final class SettingsPage
             static function (): void {
                 echo '<p>' . esc_html__('Store OpenAI API credentials securely. Keys are required before enabling automated classification.', 'axs4all-ai') . '</p>';
             },
-            'axs4all-ai'
+            $this->menuSlug
         );
 
         add_settings_field(
             'axs4all_ai_api_key',
             __('OpenAI API Key', 'axs4all-ai'),
             [$this, 'renderApiKeyField'],
-            'axs4all-ai',
+            $this->menuSlug,
             'axs4all_ai_api_section'
         );
 
@@ -64,7 +72,7 @@ final class SettingsPage
             'axs4all_ai_model',
             __('Model', 'axs4all-ai'),
             [$this, 'renderModelField'],
-            'axs4all-ai',
+            $this->menuSlug,
             'axs4all_ai_classification_section'
         );
 
@@ -72,7 +80,7 @@ final class SettingsPage
             'axs4all_ai_temperature',
             __('Temperature', 'axs4all-ai'),
             [$this, 'renderTemperatureField'],
-            'axs4all-ai',
+            $this->menuSlug,
             'axs4all_ai_classification_section'
         );
 
@@ -287,7 +295,7 @@ final class SettingsPage
             <form method="post" action="options.php">
                 <?php
                 settings_fields(self::OPTION_GROUP);
-                do_settings_sections('axs4all-ai');
+                do_settings_sections($this->menuSlug);
                 submit_button(__('Save Settings', 'axs4all-ai'));
                 ?>
             </form>
@@ -466,7 +474,7 @@ final class SettingsPage
 
         $redirectUrl = add_query_arg(
             [
-                'page' => 'axs4all-ai',
+                'page' => $this->menuSlug,
                 'exchange_rate_sync' => $status,
                 'exchange_rate_message' => $message !== '' ? rawurlencode($message) : null,
             ],

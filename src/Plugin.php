@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Axs4allAi;
 
+use Axs4allAi\Admin\AdminAssets;
 use Axs4allAi\Admin\CategoryPage;
 use Axs4allAi\Admin\ClientPage;
 use Axs4allAi\Admin\ClassificationResultsPage;
+use Axs4allAi\Admin\DashboardPage;
 use Axs4allAi\Admin\DebugPage;
 use Axs4allAi\Admin\Footer;
 use Axs4allAi\Admin\ManualClassificationPage;
@@ -59,7 +61,7 @@ final class Plugin
     {
         global $wpdb;
 
-        $this->version = (string) require AXS4ALL_AI_VERSION_FILE;
+        $this->version = AXS4ALL_AI_VERSION;
         $this->queueRepository = new QueueRepository($wpdb);
         $this->promptRepository = new PromptRepository($wpdb);
         $this->categoryRegistrar = new CategoryRegistrar();
@@ -135,7 +137,9 @@ final class Plugin
 
     private function registerAdminHooks(): void
     {
-        $settings = new SettingsPage();
+        $mainSlug = 'axs4all-ai';
+        $dashboard = new DashboardPage($this->queueRepository, $this->classificationQueueRepository);
+        $settings = new SettingsPage($mainSlug, 'axs4all-ai-settings');
         $queuePage = new QueuePage($this->queueRepository, $this->clientRepository, $this->categoryRepository, $this->snapshotRepository);
         $debugPage = new DebugPage($this->snapshotRepository, $this->debugLogger);
         $promptPage = new PromptPage($this->promptRepository, $this->categoryRepository);
@@ -152,7 +156,22 @@ final class Plugin
         $clientPage = new ClientPage($this->clientRepository, $this->categoryRepository);
         $classificationPage = new ClassificationResultsPage($this->classificationQueueRepository, $this->alertManager);
         $footer = new Footer($this->version);
+        $adminAssets = new AdminAssets([
+            $mainSlug,
+            'axs4all-ai-settings',
+            'axs4all-ai-queue',
+            'axs4all-ai-debug',
+            'axs4all-ai-prompts',
+            'axs4all-ai-categories',
+            'axs4all-ai-clients',
+            'axs4all-ai-classifications',
+            'axs4all-ai-manual',
+            'axs4all-ai-billing',
+        ]);
 
+        $adminAssets->register();
+
+        add_action('admin_menu', [$dashboard, 'registerMenu']);
         add_action('admin_menu', [$settings, 'registerMenu']);
         add_action('admin_menu', [$queuePage, 'registerMenu']);
         add_action('admin_menu', [$debugPage, 'registerMenu']);

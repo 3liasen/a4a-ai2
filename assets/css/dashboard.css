@@ -1,0 +1,15 @@
+.wrap.axs4all-adminlte {
+    background: #f4f6f9;
+    padding: 0;
+}
+.axs4all-adminlte .content-wrapper {
+    background: transparent;
+    margin: 0;
+}
+.axs4all-adminlte .content-header h1 {
+    font-size: 28px;
+    margin: 0;
+}
+.axs4all-adminlte .small-box {
+    box-shadow: none;
+}
