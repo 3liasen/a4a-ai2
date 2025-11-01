@@ -126,7 +126,7 @@ final class Plugin
     {
         $settings = new SettingsPage();
         $queuePage = new QueuePage($this->queueRepository, $this->clientRepository, $this->categoryRepository);
-        $debugPage = new DebugPage();
+        $debugPage = new DebugPage($this->snapshotRepository);
         $promptPage = new PromptPage($this->promptRepository, $this->categoryRepository);
         $manualPage = new ManualClassificationPage(
             $this->classificationQueueRepository,

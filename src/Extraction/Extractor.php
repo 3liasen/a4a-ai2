@@ -31,12 +31,18 @@ final class Extractor
         );
 
         $selected = [];
+        $selectedMap = [];
+        $hasMetadata = ! empty($metadata['phrases']) || ! empty($metadata['keywords']) || ! empty($metadata['options']);
+        $maxSnippets = $hasMetadata ? 3 : 5;
+
         foreach ($scored as $row) {
             $text = $row['text'];
-            if (! in_array($text, $selected, true)) {
+            $fingerprint = mb_strtolower($text);
+            if (! isset($selectedMap[$fingerprint])) {
                 $selected[] = $text;
+                $selectedMap[$fingerprint] = true;
             }
-            if (count($selected) >= 5) {
+            if (count($selected) >= $maxSnippets) {
                 break;
             }
         }

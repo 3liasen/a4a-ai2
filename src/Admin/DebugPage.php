@@ -4,12 +4,21 @@ declare(strict_types=1);
 
 namespace Axs4allAi\Admin;
 
+use Axs4allAi\Data\SnapshotRepository;
+
 final class DebugPage
 {
     private const MENU_SLUG = 'axs4all-ai-debug';
     private const CLEAR_ACTION = 'axs4all_ai_clear_log';
     private const DOWNLOAD_ACTION = 'axs4all_ai_download_log';
     private const NONCE_ACTION = 'axs4all_ai_debug_log_action';
+
+    private ?SnapshotRepository $snapshots;
+
+    public function __construct(?SnapshotRepository $snapshots = null)
+    {
+        $this->snapshots = $snapshots;
+    }
 
     public function registerMenu(): void
     {
@@ -43,6 +52,12 @@ final class DebugPage
         $errorMessage = isset($_GET['debug_log_error'])
             ? sanitize_text_field((string) $_GET['debug_log_error'])
             : null;
+        $viewSnapshotId = isset($_GET['snapshot_id']) ? absint((string) $_GET['snapshot_id']) : 0;
+        $snapshotDetail = null;
+        if ($viewSnapshotId > 0 && $this->snapshots instanceof SnapshotRepository) {
+            $snapshotDetail = $this->snapshots->find($viewSnapshotId);
+        }
+        $recentSnapshots = $this->snapshots instanceof SnapshotRepository ? $this->snapshots->latest(10) : [];
 
         ?>
         <div class="wrap">
@@ -87,6 +102,84 @@ final class DebugPage
                     ?>
                 </p>
                 <textarea readonly rows="20" style="width:100%; font-family: Menlo, Consolas, monospace;"><?php echo esc_textarea(implode("\n", $preview['lines'])); ?></textarea>
+            <?php endif; ?>
+
+            <?php if ($this->snapshots instanceof SnapshotRepository) : ?>
+                <hr>
+                <h2><?php esc_html_e('Recent Snapshots', 'axs4all-ai'); ?></h2>
+                <p class="description">
+                    <?php esc_html_e('These are the last pages captured by the crawler. Use them to double-check what the extractor and classifier received.', 'axs4all-ai'); ?>
+                </p>
+
+                <?php if (empty($recentSnapshots)) : ?>
+                    <p><?php esc_html_e('No crawl snapshots stored yet.', 'axs4all-ai'); ?></p>
+                <?php else : ?>
+                    <table class="widefat striped">
+                        <thead>
+                            <tr>
+                                <th><?php esc_html_e('ID', 'axs4all-ai'); ?></th>
+                                <th><?php esc_html_e('Queue ID', 'axs4all-ai'); ?></th>
+                                <th><?php esc_html_e('Source URL', 'axs4all-ai'); ?></th>
+                                <th><?php esc_html_e('Category', 'axs4all-ai'); ?></th>
+                                <th><?php esc_html_e('Fetched At', 'axs4all-ai'); ?></th>
+                                <th><?php esc_html_e('Content Hash', 'axs4all-ai'); ?></th>
+                                <th><?php esc_html_e('Actions', 'axs4all-ai'); ?></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($recentSnapshots as $snapshot) : ?>
+                                <tr>
+                                    <td><?php echo esc_html((string) $snapshot['id']); ?></td>
+                                    <td><?php echo esc_html((string) ($snapshot['queue_id'] ?? '—')); ?></td>
+                                    <td class="column-primary" style="max-width: 240px; word-break: break-all;">
+                                        <?php echo esc_html((string) ($snapshot['source_url'] ?? '')); ?>
+                                    </td>
+                                    <td><?php echo esc_html((string) ($snapshot['category'] ?? '')); ?></td>
+                                    <td><?php echo esc_html((string) $snapshot['fetched_at']); ?></td>
+                                    <td><code><?php echo esc_html(substr((string) $snapshot['content_hash'], 0, 12)); ?></code></td>
+                                    <td>
+                                        <?php
+                                        $viewUrl = add_query_arg(
+                                            [
+                                                'page' => self::MENU_SLUG,
+                                                'snapshot_id' => (int) $snapshot['id'],
+                                            ],
+                                            admin_url('admin.php')
+                                        );
+                                        ?>
+                                        <a class="button button-small" href="<?php echo esc_url($viewUrl); ?>">
+                                            <?php esc_html_e('View HTML', 'axs4all-ai'); ?>
+                                        </a>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+
+                <?php if ($snapshotDetail !== null) : ?>
+                    <hr>
+                    <h3>
+                        <?php
+                        printf(
+                            /* translators: %d snapshot id */
+                            esc_html__('Snapshot #%d details', 'axs4all-ai'),
+                            (int) $snapshotDetail['id']
+                        );
+                        ?>
+                    </h3>
+                    <p>
+                        <strong><?php esc_html_e('Queue ID:', 'axs4all-ai'); ?></strong>
+                        <?php echo esc_html((string) ($snapshotDetail['queue_id'] ?? '—')); ?>
+                        <br>
+                        <strong><?php esc_html_e('Source URL:', 'axs4all-ai'); ?></strong>
+                        <?php echo esc_html((string) ($snapshotDetail['source_url'] ?? '')); ?>
+                        <br>
+                        <strong><?php esc_html_e('Fetched at:', 'axs4all-ai'); ?></strong>
+                        <?php echo esc_html((string) $snapshotDetail['fetched_at']); ?>
+                    </p>
+                    <textarea readonly rows="20" style="width:100%; font-family: Menlo, Consolas, monospace;"><?php echo esc_textarea((string) $snapshotDetail['content']); ?></textarea>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
         <?php
