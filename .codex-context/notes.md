@@ -1564,3 +1564,10 @@ I’m sorry about that. I don’t have any automatic way to know when you upgrad
 ## Phase 3 follow-ups
 - Push alert metrics to external observability (Grafana/DataDog) from the new logger/health monitor.
 - Finalise production pager/on-call integration (replace generic webhook defaults with the chosen provider details).
+
+## 2025-11-01 status snapshot
+- Version bumped to 0.0.38 after wiring the AdminLTE dashboard, settings refactor, and billing upgrades.
+- Billing page now shows hourly usage via uPlot with quick ranges (today/yesterday/last 24/48h) and keeps daily/monthly Chart.js views.
+- Temperature control uses slider + numeric field (settings.js) for better UX; all settings cards use AdminLTE styling.
+- Latest crawl/classification repos support `hour` granularity for billing stats.
+- Outstanding: finish Phase 4 Part 1 polish (dashboard/billing testing), tighten crawler retry/log work, and plan Phase 4 Part 2 deliverables.
