@@ -65,7 +65,7 @@ final class SettingsPage
             static function (): void {
                 echo '<p>' . esc_html__('Configure how automated classification jobs interact with the AI provider.', 'axs4all-ai') . '</p>';
             },
-            'axs4all-ai'
+            $this->menuSlug
         );
 
         add_settings_field(
@@ -88,7 +88,7 @@ final class SettingsPage
             'axs4all_ai_prompt_price',
             __('Prompt Cost (USD / 1M tokens)', 'axs4all-ai'),
             [$this, 'renderPromptPriceField'],
-            'axs4all-ai',
+            $this->menuSlug,
             'axs4all_ai_classification_section'
         );
 
@@ -96,7 +96,7 @@ final class SettingsPage
             'axs4all_ai_completion_price',
             __('Completion Cost (USD / 1M tokens)', 'axs4all-ai'),
             [$this, 'renderCompletionPriceField'],
-            'axs4all-ai',
+            $this->menuSlug,
             'axs4all_ai_classification_section'
         );
 
@@ -104,7 +104,7 @@ final class SettingsPage
             'axs4all_ai_timeout',
             __('Request Timeout (seconds)', 'axs4all-ai'),
             [$this, 'renderTimeoutField'],
-            'axs4all-ai',
+            $this->menuSlug,
             'axs4all_ai_classification_section'
         );
 
@@ -112,7 +112,7 @@ final class SettingsPage
             'axs4all_ai_batch_size',
             __('Batch Size', 'axs4all-ai'),
             [$this, 'renderBatchSizeField'],
-            'axs4all-ai',
+            $this->menuSlug,
             'axs4all_ai_classification_section'
         );
 
@@ -120,7 +120,7 @@ final class SettingsPage
             'axs4all_ai_max_attempts',
             __('Max Attempts', 'axs4all-ai'),
             [$this, 'renderMaxAttemptsField'],
-            'axs4all-ai',
+            $this->menuSlug,
             'axs4all_ai_classification_section'
         );
 
@@ -128,7 +128,7 @@ final class SettingsPage
             'axs4all_ai_exchange_rate_auto',
             __('Auto-fetch USD to DKK rate', 'axs4all-ai'),
             [$this, 'renderExchangeRateAutoField'],
-            'axs4all-ai',
+            $this->menuSlug,
             'axs4all_ai_classification_section'
         );
 
@@ -136,7 +136,7 @@ final class SettingsPage
             'axs4all_ai_exchange_rate_api_key',
             __('FreeCurrencyAPI key', 'axs4all-ai'),
             [$this, 'renderExchangeRateApiKeyField'],
-            'axs4all-ai',
+            $this->menuSlug,
             'axs4all_ai_classification_section'
         );
 
@@ -144,7 +144,7 @@ final class SettingsPage
             'axs4all_ai_exchange_rate',
             __('USD to DKK rate', 'axs4all-ai'),
             [$this, 'renderExchangeRateField'],
-            'axs4all-ai',
+            $this->menuSlug,
             'axs4all_ai_classification_section'
         );
 
@@ -154,14 +154,14 @@ final class SettingsPage
             static function (): void {
                 echo '<p>' . esc_html__('Configure proactive alerts and notification endpoints.', 'axs4all-ai') . '</p>';
             },
-            'axs4all-ai'
+            $this->menuSlug
         );
 
         add_settings_field(
             'axs4all_ai_alert_email',
             __('Alert Email', 'axs4all-ai'),
             [$this, 'renderAlertEmailField'],
-            'axs4all-ai',
+            $this->menuSlug,
             'axs4all_ai_alerts_section'
         );
 
@@ -169,7 +169,7 @@ final class SettingsPage
             'axs4all_ai_alert_slack',
             __('Slack Webhook', 'axs4all-ai'),
             [$this, 'renderAlertSlackField'],
-            'axs4all-ai',
+            $this->menuSlug,
             'axs4all_ai_alerts_section'
         );
 
@@ -177,7 +177,7 @@ final class SettingsPage
             'axs4all_ai_alert_queue_threshold',
             __('Queue Threshold', 'axs4all-ai'),
             [$this, 'renderAlertQueueThresholdField'],
-            'axs4all-ai',
+            $this->menuSlug,
             'axs4all_ai_alerts_section'
         );
 
@@ -185,7 +185,7 @@ final class SettingsPage
             'axs4all_ai_alert_ticket_webhook',
             __('Ticketing Webhook', 'axs4all-ai'),
             [$this, 'renderAlertTicketField'],
-            'axs4all-ai',
+            $this->menuSlug,
             'axs4all_ai_alerts_section'
         );
     }
