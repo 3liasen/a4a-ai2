@@ -113,6 +113,7 @@ final class DebugPage
             <?php endif; ?>
 
             <?php if ($this->logger instanceof DebugLogger) : ?>
+                <?php $this->renderAlertSummary(); ?>
                 <hr>
                 <h2><?php esc_html_e('Crawler Events', 'axs4all-ai'); ?></h2>
                 <p class="description">
@@ -457,6 +458,49 @@ final class DebugPage
 
         wp_safe_redirect($url);
         exit;
+    }
+
+    private function renderAlertSummary(): void
+    {
+        if (! $this->logger instanceof DebugLogger) {
+            return;
+        }
+
+        $alerts = $this->logger->all(50, 'alert');
+        if (empty($alerts)) {
+            return;
+        }
+
+        $counts = [
+            'critical' => 0,
+            'warning' => 0,
+            'info' => 0,
+        ];
+
+        foreach ($alerts as $alert) {
+            $severity = isset($alert['context']['severity']) ? (string) $alert['context']['severity'] : 'warning';
+            if (! isset($counts[$severity])) {
+                $counts[$severity] = 0;
+            }
+            $counts[$severity]++;
+        }
+
+        echo '<h2>' . esc_html__('Alert Activity', 'axs4all-ai') . '</h2>';
+        echo '<p class="description">' . esc_html__('Recent alert events by severity.', 'axs4all-ai') . '</p>';
+        echo '<table class="widefat fixed striped" style="max-width:480px">';
+        echo '<thead><tr>';
+        echo '<th>' . esc_html__('Severity', 'axs4all-ai') . '</th>';
+        echo '<th>' . esc_html__('Count (last 50)', 'axs4all-ai') . '</th>';
+        echo '</tr></thead><tbody>';
+
+        foreach (['critical', 'warning', 'info'] as $label) {
+            echo '<tr>';
+            echo '<td>' . esc_html(ucfirst($label)) . '</td>';
+            echo '<td>' . esc_html((string) $counts[$label]) . '</td>';
+            echo '</tr>';
+        }
+
+        echo '</tbody></table>';
     }
 
     private function renderNotice(?string $message, ?string $error): void

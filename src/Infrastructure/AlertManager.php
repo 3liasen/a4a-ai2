@@ -12,6 +12,8 @@ final class AlertManager
         'warning' => 1,
         'critical' => 2,
     ];
+    private const PROVIDER_PAGERDUTY = 'pagerduty';
+    private const PROVIDER_WEBHOOK = 'webhook';
 
     private DebugLogger $logger;
 
@@ -96,8 +98,9 @@ final class AlertManager
             $sent = $this->sendSlack((string) $settings['alert_slack_webhook'], $subject . "\n" . $message, $severity) || $sent;
         }
 
-        if (! empty($settings['alert_ticket_webhook']) && $this->severityAllowed($severity, (string) ($settings['alert_ticket_min_severity'] ?? 'critical'))) {
-            $sent = $this->sendTicket((string) $settings['alert_ticket_webhook'], $subject, $message, $severity) || $sent;
+        $provider = isset($settings['alert_ticket_provider']) ? (string) $settings['alert_ticket_provider'] : self::PROVIDER_WEBHOOK;
+        if ($provider !== 'none' && $this->severityAllowed($severity, (string) ($settings['alert_ticket_min_severity'] ?? 'critical'))) {
+            $sent = $this->dispatchTicket($provider, $settings, $subject, $message, $severity) || $sent;
         }
 
         if ($sent) {
@@ -146,7 +149,27 @@ final class AlertManager
         return true;
     }
 
-    private function sendTicket(string $endpoint, string $subject, string $message, string $severity): bool
+    private function dispatchTicket(string $provider, array $settings, string $subject, string $message, string $severity): bool
+    {
+        if ($provider === self::PROVIDER_PAGERDUTY) {
+            $routingKey = isset($settings['alert_pagerduty_routing_key']) ? (string) $settings['alert_pagerduty_routing_key'] : '';
+            if ($routingKey === '') {
+                $this->logger->record('alert_error', 'PagerDuty routing key missing; skipping ticket.', ['severity' => $severity]);
+                return false;
+            }
+
+            return $this->sendPagerDuty($routingKey, $subject, $message, $severity);
+        }
+
+        $endpoint = isset($settings['alert_ticket_webhook']) ? (string) $settings['alert_ticket_webhook'] : '';
+        if ($endpoint === '') {
+            return false;
+        }
+
+        return $this->sendWebhookTicket($endpoint, $subject, $message, $severity);
+    }
+
+    private function sendWebhookTicket(string $endpoint, string $subject, string $message, string $severity): bool
     {
         $payload = [
             'title' => $subject,
@@ -173,6 +196,45 @@ final class AlertManager
 
         $this->logger->record('alert_ticket', 'Ticket created for alert.', [
             'endpoint' => $endpoint,
+            'severity' => $severity,
+        ]);
+
+        return true;
+    }
+
+    private function sendPagerDuty(string $routingKey, string $subject, string $message, string $severity): bool
+    {
+        $severity = $this->mapSeverityToPagerDuty($severity);
+        $payload = [
+            'routing_key' => $routingKey,
+            'event_action' => 'trigger',
+            'payload' => [
+                'summary' => $subject,
+                'source' => 'axs4all-ai',
+                'severity' => $severity,
+                'timestamp' => current_time('mysql', true),
+                'custom_details' => [
+                    'message' => $message,
+                ],
+            ],
+        ];
+
+        $response = wp_remote_post('https://events.pagerduty.com/v2/enqueue', [
+            'timeout' => 10,
+            'headers' => [
+                'Content-Type' => 'application/json',
+            ],
+            'body' => $this->encode($payload),
+        ]);
+
+        if (is_wp_error($response)) {
+            $this->logger->record('alert_error', 'Failed to send PagerDuty event: ' . $response->get_error_message(), [
+                'severity' => $severity,
+            ]);
+            return false;
+        }
+
+        $this->logger->record('alert_ticket', 'PagerDuty event triggered.', [
             'severity' => $severity,
         ]);
 
@@ -211,6 +273,18 @@ final class AlertManager
         $minimum = $this->normalizeSeverity($minimum);
 
         return self::SEVERITY_ORDER[$candidate] >= self::SEVERITY_ORDER[$minimum];
+    }
+
+    private function mapSeverityToPagerDuty(string $severity): string
+    {
+        switch ($severity) {
+            case 'critical':
+                return 'critical';
+            case 'warning':
+                return 'warning';
+            default:
+                return 'info';
+        }
     }
 }
 

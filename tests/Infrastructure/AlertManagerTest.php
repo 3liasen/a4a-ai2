@@ -15,6 +15,7 @@ final class AlertManagerTest extends TestCase
         parent::setUp();
         $GLOBALS['wp_options'] = [];
         $GLOBALS['wp_mails'] = [];
+        $GLOBALS['wp_remote_post_requests'] = [];
         $this->logger = new DebugLogger();
         $this->manager = new AlertManager($this->logger);
     }
@@ -59,6 +60,7 @@ final class AlertManagerTest extends TestCase
     public function testTicketWebhookCreatesAlertState(): void
     {
         update_option('axs4all_ai_settings', [
+            'alert_ticket_provider' => 'webhook',
             'alert_ticket_webhook' => 'https://ticket.example/ingest',
             'alert_ticket_min_severity' => 'warning',
         ]);
@@ -67,6 +69,27 @@ final class AlertManagerTest extends TestCase
 
         $state = get_option('axs4all_ai_alert_state', []);
         self::assertArrayHasKey('cron_classification', $state);
+        self::assertNotEmpty($GLOBALS['wp_remote_post_requests']);
+        $request = $GLOBALS['wp_remote_post_requests'][0];
+        self::assertSame('https://ticket.example/ingest', $request['url']);
+    }
+
+    public function testPagerDutyPayloadUsesRoutingKey(): void
+    {
+        update_option('axs4all_ai_settings', [
+            'alert_ticket_provider' => 'pagerduty',
+            'alert_pagerduty_routing_key' => 'routing-key-123',
+            'alert_ticket_min_severity' => 'critical',
+        ]);
+
+        $this->manager->ensureCronScheduled('missing_hook', 'crawl');
+
+        $requests = $GLOBALS['wp_remote_post_requests'];
+        self::assertNotEmpty($requests);
+        $last = end($requests);
+        self::assertSame('https://events.pagerduty.com/v2/enqueue', $last['url']);
+        $body = $last['args']['body'] ?? '';
+        self::assertStringContainsString('routing-key-123', (string) $body);
     }
 
     private AlertManager $manager;

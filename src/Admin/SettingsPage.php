@@ -259,6 +259,13 @@ final class SettingsPage
         $output['alert_queue_threshold'] = max(0, $thresholdInput);
 
         $output['alert_ticket_webhook'] = esc_url_raw((string) ($input['alert_ticket_webhook'] ?? ($existing['alert_ticket_webhook'] ?? '')));
+        $provider = isset($input['alert_ticket_provider']) ? (string) $input['alert_ticket_provider'] : ($existing['alert_ticket_provider'] ?? 'none');
+        $allowedProviders = ['none', 'webhook', 'pagerduty'];
+        if (! in_array($provider, $allowedProviders, true)) {
+            $provider = 'none';
+        }
+        $output['alert_ticket_provider'] = $provider;
+        $output['alert_pagerduty_routing_key'] = sanitize_text_field((string) ($input['alert_pagerduty_routing_key'] ?? ($existing['alert_pagerduty_routing_key'] ?? '')));
 
         $output['alert_email_min_severity'] = $this->sanitizeSeverity((string) ($input['alert_email_min_severity'] ?? ($existing['alert_email_min_severity'] ?? 'warning')));
         $output['alert_slack_min_severity'] = $this->sanitizeSeverity((string) ($input['alert_slack_min_severity'] ?? ($existing['alert_slack_min_severity'] ?? 'warning')));
@@ -656,6 +663,25 @@ final class SettingsPage
         $options = get_option(self::OPTION_NAME, []);
         $value = isset($options['alert_ticket_webhook']) ? (string) $options['alert_ticket_webhook'] : '';
         $selected = isset($options['alert_ticket_min_severity']) ? (string) $options['alert_ticket_min_severity'] : 'critical';
+        $provider = isset($options['alert_ticket_provider']) ? (string) $options['alert_ticket_provider'] : 'none';
+        $routingKey = isset($options['alert_pagerduty_routing_key']) ? (string) $options['alert_pagerduty_routing_key'] : '';
+
+        echo '<p><label>' . esc_html__('Ticketing provider:', 'axs4all-ai') . ' ';
+        echo '<select name="' . esc_attr(self::OPTION_NAME . '[alert_ticket_provider]') . '">';
+        $providers = [
+            'none' => __('None', 'axs4all-ai'),
+            'webhook' => __('Generic Webhook', 'axs4all-ai'),
+            'pagerduty' => __('PagerDuty Events API', 'axs4all-ai'),
+        ];
+        foreach ($providers as $key => $label) {
+            printf(
+                '<option value="%1$s" %2$s>%3$s</option>',
+                esc_attr($key),
+                selected($provider, $key, false),
+                esc_html($label)
+            );
+        }
+        echo '</select></label></p>';
 
         printf(
             '<input type="url" name="%1$s[alert_ticket_webhook]" value="%2$s" class="regular-text" placeholder="https://tickets.example/api" />',
@@ -663,6 +689,14 @@ final class SettingsPage
             esc_attr($value)
         );
         echo '<p class="description">' . esc_html__('Optional webhook that opens tickets or notifies the on-call rota.', 'axs4all-ai') . '</p>';
+
+        printf(
+            '<input type="text" name="%1$s[alert_pagerduty_routing_key]" value="%2$s" class="regular-text" placeholder="PagerDuty routing key" />',
+            esc_attr(self::OPTION_NAME),
+            esc_attr($routingKey)
+        );
+        echo '<p class="description">' . esc_html__('PagerDuty integration: routing key for the Events API v2.', 'axs4all-ai') . '</p>';
+
         $this->renderSeveritySelect('alert_ticket_min_severity', $selected, __('Open tickets/on-call notifications when alerts meet or exceed this severity.', 'axs4all-ai'));
     }
 }

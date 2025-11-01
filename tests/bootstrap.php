@@ -413,6 +413,12 @@ if (! function_exists('is_wp_error')) {
 if (! function_exists('wp_remote_post')) {
     function wp_remote_post(string $url, array $args = [])
     {
+        $record = [
+            'url' => $url,
+            'args' => $args,
+        ];
+        $GLOBALS['wp_remote_post_requests'][] = $record;
+
         return [
             'body' => $args['body'] ?? '',
             'response' => ['code' => 200],
