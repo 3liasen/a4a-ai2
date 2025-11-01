@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
@@ -70,6 +70,32 @@ final class BillingPage
         ]);
         $dailyJson = wp_json_encode($dailyData);
         $monthlyJson = wp_json_encode($monthlyData);
+
+        $hourlyRangeKey = isset($_GET['hourly_range']) ? sanitize_key((string) $_GET['hourly_range']) : 'today';
+        $rangeOptions = $this->getHourlyRangeOptions();
+        if (! isset($rangeOptions[$hourlyRangeKey])) {
+            $hourlyRangeKey = 'today';
+        }
+        $selectedRange = $rangeOptions[$hourlyRangeKey];
+        $hourlyFilters = [];
+        if (! empty($selectedRange['start'])) {
+            $hourlyFilters['created_start'] = $selectedRange['start'];
+        }
+        if (! empty($selectedRange['end'])) {
+            $hourlyFilters['created_end'] = $selectedRange['end'];
+        }
+        $hourlyRows = $this->repository->getTokenTimeline($hourlyFilters, 'hour', (int) $selectedRange['limit']);
+        $hourlyData = $this->buildHourlyPlotData($hourlyRows);
+        $hourlyJson = wp_json_encode($hourlyData);
+        if ($hourlyJson === false) {
+            $hourlyJson = wp_json_encode([
+                'timestamps' => [],
+                'prompt_tokens' => [],
+                'completion_tokens' => [],
+                'labels' => [],
+            ]);
+        }
+        $hourlyDescription = $selectedRange['description'];
 
         $exchangeRateInfo = $this->formatExchangeRateInfo($exchangeRate, $exchangeRateAuto, $exchangeRateUpdatedAt);
 
@@ -143,6 +169,31 @@ final class BillingPage
                 <?php echo esc_html($exchangeRateInfo); ?>
             </p>
 
+            <h2 style="margin-top:2.5rem;"><?php esc_html_e('Hourly usage', 'axs4all-ai'); ?></h2>
+            <form method="get" class="axs4all-ai-hourly-form">
+                <input type="hidden" name="page" value="<?php echo esc_attr(self::MENU_SLUG); ?>">
+                <label for="axs4all-ai-hourly-range"><?php esc_html_e('Quick range', 'axs4all-ai'); ?></label>
+                <select id="axs4all-ai-hourly-range" name="hourly_range" onchange="this.form.submit()">
+                    <?php foreach ($rangeOptions as $key => $option) : ?>
+                        <option value="<?php echo esc_attr($key); ?>" <?php selected($key, $hourlyRangeKey); ?>>
+                            <?php echo esc_html($option['label']); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </form>
+            <p class="description" id="axs4all-ai-hourly-description">
+                <?php echo esc_html($hourlyDescription); ?>
+            </p>
+
+            <div class="card axs4all-ai-hourly-card">
+                <div class="card-header">
+                    <h3 class="card-title"><?php esc_html_e('Tokens per hour', 'axs4all-ai'); ?></h3>
+                </div>
+                <div class="card-body">
+                    <div id="axs4all-ai-hourly-chart" class="axs4all-ai-hourly-chart"></div>
+                </div>
+            </div>
+
             <h2 style="margin-top:2.5rem;"><?php esc_html_e('Daily usage (last 14 days)', 'axs4all-ai'); ?></h2>
             <?php if (! empty($dailyData['labels'])) : ?>
                 <div style="max-width:960px;">
@@ -164,12 +215,91 @@ final class BillingPage
             <?php endif; ?>
         </div>
 
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uplot@1.6.24/dist/uPlot.min.css">
+        <script src="https://cdn.jsdelivr.net/npm/uplot@1.6.24/dist/uPlot.iife.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-vP4RcVYkxFxM5zuvUl3tme5OzxCAdGsi/jN/NQu5LH8J10NQrThbq0g6U4fW0z2x" crossorigin="anonymous"></script>
         <script>
         (function () {
             const pricing = <?php echo $pricingJson; ?>;
             const daily = <?php echo $dailyJson; ?>;
             const monthly = <?php echo $monthlyJson; ?>;
+            const hourly = <?php echo $hourlyJson; ?>;
+            const siteTimezone = <?php echo wp_json_encode(wp_timezone_string() ?: 'UTC'); ?>;
+            const hourlyStrings = {
+                empty: '<?php echo esc_js(__('No usage recorded for this range yet.', 'axs4all-ai')); ?>',
+                missingLib: '<?php echo esc_js(__('Unable to load the hourly chart (uPlot missing).', 'axs4all-ai')); ?>'
+            };
+
+            function renderHourly(data) {
+                const container = document.getElementById('axs4all-ai-hourly-chart');
+                if (!container) {
+                    return;
+                }
+
+                container.innerHTML = '';
+
+                if (typeof uPlot === 'undefined') {
+                    container.innerHTML = '<p class="description">' + hourlyStrings.missingLib + '</p>';
+                    return;
+                }
+
+                if (!data || !Array.isArray(data.timestamps) || data.timestamps.length === 0) {
+                    container.innerHTML = '<p class="description">' + hourlyStrings.empty + '</p>';
+                    return;
+                }
+
+                const initialWidth = container.clientWidth || container.offsetWidth || 600;
+
+                const opts = {
+                    width: initialWidth,
+                    height: 320,
+                    class: 'uplot axs4all-uplot',
+                    scales: {
+                        x: { time: true },
+                        y: { auto: true },
+                    },
+                    axes: [
+                        {
+                            stroke: '#6c757d',
+                            grid: { stroke: '#e5e7eb' },
+                            values: (u, ticks) => ticks.map((value) => uPlot.fmtDate(new Date(value * 1000), '%H:%M')),
+                        },
+                        {
+                            stroke: '#6c757d',
+                            grid: { stroke: '#e5e7eb' },
+                            values: (u, ticks) => ticks.map((value) => Number(value).toLocaleString()),
+                        },
+                    ],
+                    series: [
+                        {},
+                        {
+                            label: '<?php echo esc_js(__('Prompt tokens', 'axs4all-ai')); ?>',
+                            stroke: '#3c8dbc',
+                            fill: 'rgba(60, 141, 188, 0.18)',
+                            width: 2,
+                        },
+                        {
+                            label: '<?php echo esc_js(__('Completion tokens', 'axs4all-ai')); ?>',
+                            stroke: '#48bb78',
+                            fill: 'rgba(72, 187, 120, 0.18)',
+                            width: 2,
+                        },
+                    ],
+                };
+
+                if (siteTimezone) {
+                    opts.tzDate = uPlot.tzDate(siteTimezone);
+                }
+
+                const chart = new uPlot(opts, [data.timestamps, data.prompt_tokens, data.completion_tokens], container);
+
+                window.addEventListener('resize', function () {
+                    const newWidth = container.clientWidth || container.offsetWidth || initialWidth;
+                    chart.setSize({ width: newWidth, height: 320 });
+                });
+            }
+
+            renderHourly(hourly);
 
             if (typeof Chart === 'undefined') {
                 return;
@@ -337,7 +467,103 @@ final class BillingPage
             return date_i18n('M Y', $timestamp);
         }
 
+        if ($granularity === 'hour') {
+            return date_i18n('M j, H:i', $timestamp);
+        }
+
         return date_i18n('M j', $timestamp);
+    }
+
+    /**
+     * @param array<int, array{label:string,prompt_tokens:int,completion_tokens:int}> $rows
+     * @return array{timestamps:array<int,int>,prompt_tokens:array<int,int>,completion_tokens:array<int,int>,labels:array<int,string>}
+     */
+    private function buildHourlyPlotData(array $rows): array
+    {
+        $timestamps = [];
+        $prompt = [];
+        $completion = [];
+        $labels = [];
+
+        foreach ($rows as $row) {
+            $timestamp = strtotime($row['label']);
+            if ($timestamp === false) {
+                continue;
+            }
+
+            $timestamps[] = $timestamp;
+            $prompt[] = (int) $row['prompt_tokens'];
+            $completion[] = (int) $row['completion_tokens'];
+            $labels[] = date_i18n('H:i', $timestamp);
+        }
+
+        return [
+            'timestamps' => $timestamps,
+            'prompt_tokens' => $prompt,
+            'completion_tokens' => $completion,
+            'labels' => $labels,
+        ];
+    }
+
+    /**
+     * @return array<string, array{label:string,description:string,start:string,end:string,limit:int}>
+     */
+    private function getHourlyRangeOptions(): array
+    {
+        $timezone = wp_timezone();
+        $now = new \DateTimeImmutable('now', $timezone);
+
+        $todayStart = $now->setTime(0, 0, 0);
+        $yesterdayStart = $todayStart->sub(new \DateInterval('P1D'));
+        $yesterdayEnd = $yesterdayStart->setTime(23, 59, 59);
+        $last24Start = $now->sub(new \DateInterval('PT24H'));
+        $last48Start = $now->sub(new \DateInterval('PT48H'));
+
+        return [
+            'today' => [
+                'label' => sprintf(__('Today (%s)', 'axs4all-ai'), date_i18n('M j', $now->getTimestamp())),
+                'description' => $this->describeRange($todayStart, $now),
+                'start' => $this->formatMysql($todayStart),
+                'end' => $this->formatMysql($now),
+                'limit' => 36,
+            ],
+            'yesterday' => [
+                'label' => sprintf(__('Yesterday (%s)', 'axs4all-ai'), date_i18n('M j', $yesterdayStart->getTimestamp())),
+                'description' => $this->describeRange($yesterdayStart, $yesterdayEnd),
+                'start' => $this->formatMysql($yesterdayStart),
+                'end' => $this->formatMysql($yesterdayEnd),
+                'limit' => 36,
+            ],
+            'last_24_hours' => [
+                'label' => __('Last 24 hours', 'axs4all-ai'),
+                'description' => $this->describeRange($last24Start, $now),
+                'start' => $this->formatMysql($last24Start),
+                'end' => $this->formatMysql($now),
+                'limit' => 48,
+            ],
+            'last_48_hours' => [
+                'label' => __('Last 48 hours', 'axs4all-ai'),
+                'description' => $this->describeRange($last48Start, $now),
+                'start' => $this->formatMysql($last48Start),
+                'end' => $this->formatMysql($now),
+                'limit' => 96,
+            ],
+        ];
+    }
+
+    private function formatMysql(\DateTimeImmutable $date): string
+    {
+        return $date->format('Y-m-d H:i:s');
+    }
+
+    private function describeRange(\DateTimeImmutable $start, \DateTimeImmutable $end): string
+    {
+        return sprintf(
+            /* translators: 1: start datetime, 2: end datetime */
+            __('Range: %1$s - %2$s', 'axs4all-ai'),
+            date_i18n('M j H:i', $start->getTimestamp()),
+            date_i18n('M j H:i', $end->getTimestamp())
+        );
     }
 
     private function formatExchangeRateInfo(float $exchangeRate, bool $auto, ?string $updatedAt): string

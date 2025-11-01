@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       axs4all AI Accessibility
  * Description:       Automates accessibility data collection and AI-driven classification for axs4all.
- * Version:           0.0.37
+ * Version:           0.0.38
  * Author:            SevenYellowMonkeys
  * Requires at least: 6.0
  * Requires PHP:      8.1

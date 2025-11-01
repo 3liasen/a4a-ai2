@@ -368,6 +368,10 @@ final class ClassificationQueueRepository
             $labelSelect = "DATE_FORMAT(r.created_at, '%Y-%m-01')";
         }
 
+        if ($granularity === 'hour') {
+            $labelSelect = "DATE_FORMAT(r.created_at, '%Y-%m-%d %H:00:00')";
+        }
+
         $sql = "
             SELECT
                 {$labelSelect} AS label,

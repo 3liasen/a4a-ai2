@@ -87,3 +87,23 @@
 .axs4all-slider-output {
     font-weight: 600;
 }
+.axs4all-ai-hourly-form {
+    margin: 1rem 0 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+.axs4all-ai-hourly-form select {
+    min-width: 200px;
+}
+.axs4all-ai-hourly-card {
+    max-width: 960px;
+    margin-top: 1rem;
+}
+.axs4all-ai-hourly-chart {
+    min-height: 320px;
+}
+.axs4all-ai-hourly-chart .description {
+    margin: 0;
+}
