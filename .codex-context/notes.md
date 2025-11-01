@@ -1,2 +1,3 @@
 # Codex Context
 
+Phase 0 and Phase 1 are fully wrapped. Phase 2’s AI engine work (prompt/category management, live OpenAI client, queue processing, billing/reporting additions) is in place and passing the current PHPUnit suite. We’ve already kicked off Phase 3: schema and admin UX for clients/categories exist, but the crawl/classification pipeline still needs to read from the new client tables, carry those IDs through the queue, and update the results UI accordingly (see docs/PHASE3_CLIENT_CATEGORY_DESIGN.md). Remaining to-do items include finishing that wiring, backfill/upgrade logic, and adding tests for the new repositories plus the exchange-rate automation. Once those land we can call Phase 2 “done-done” and focus fully on the rest of Phase 3.
