@@ -288,16 +288,24 @@ final class SettingsPage
             return;
         }
 
+        $sections = $this->getSections();
+
         ?>
-        <div class="wrap">
+        <div class="wrap axs4all-ai-settings-page">
             <h1><?php esc_html_e('axs4all AI Settings', 'axs4all-ai'); ?></h1>
             <?php $this->renderExchangeRateNotice(); ?>
-            <form method="post" action="options.php">
-                <?php
-                settings_fields(self::OPTION_GROUP);
-                do_settings_sections($this->menuSlug);
-                submit_button(__('Save Settings', 'axs4all-ai'));
-                ?>
+            <form method="post" action="options.php" class="axs4all-ai-settings-form">
+                <?php settings_fields(self::OPTION_GROUP); ?>
+                <?php if (! empty($sections)) : ?>
+                    <div class="axs4all-ai-settings-grid">
+                        <?php foreach ($sections as $sectionId => $section) : ?>
+                            <?php $this->renderSectionCard((string) $sectionId, $section); ?>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else : ?>
+                    <p><?php esc_html_e('No settings available at the moment.', 'axs4all-ai'); ?></p>
+                <?php endif; ?>
+                <?php submit_button(__('Save Settings', 'axs4all-ai')); ?>
             </form>
         </div>
         <?php
@@ -706,5 +714,111 @@ final class SettingsPage
         echo '<p class="description">' . esc_html__('PagerDuty integration: routing key for the Events API v2.', 'axs4all-ai') . '</p>';
 
         $this->renderSeveritySelect('alert_ticket_min_severity', $selected, __('Open tickets/on-call notifications when alerts meet or exceed this severity.', 'axs4all-ai'));
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private function getSections(): array
+    {
+        global $wp_settings_sections;
+
+        return isset($wp_settings_sections[$this->menuSlug]) && is_array($wp_settings_sections[$this->menuSlug])
+            ? $wp_settings_sections[$this->menuSlug]
+            : [];
+    }
+
+    /**
+     * @param string                 $sectionId
+     * @param array<string, mixed>   $section
+     */
+    private function renderSectionCard(string $sectionId, array $section): void
+    {
+        global $wp_settings_fields;
+
+        $fields = $wp_settings_fields[$this->menuSlug][$sectionId] ?? [];
+
+        echo '<div class="card card-outline card-primary axs4all-settings-card">';
+
+        if (! empty($section['title'])) {
+            echo '<div class="card-header"><h3 class="card-title">' . esc_html((string) $section['title']) . '</h3></div>';
+        }
+
+        echo '<div class="card-body">';
+
+        if (isset($section['callback']) && is_callable($section['callback'])) {
+            $callback = $section['callback'];
+            if ($this->callbackAcceptsArgs($callback)) {
+                call_user_func($callback, $section);
+            } else {
+                call_user_func($callback);
+            }
+        }
+
+        if (! empty($fields)) {
+            echo '<div class="axs4all-settings-fields">';
+            foreach ($fields as $field) {
+                $this->renderField($field);
+            }
+            echo '</div>';
+        } else {
+            echo '<p class="description">' . esc_html__('No options registered for this section.', 'axs4all-ai') . '</p>';
+        }
+
+        echo '</div></div>';
+    }
+
+    /**
+     * @param array<string, mixed> $field
+     */
+    private function renderField(array $field): void
+    {
+        if (! isset($field['callback']) || ! is_callable($field['callback'])) {
+            return;
+        }
+
+        $wrapperId = isset($field['id']) ? (string) $field['id'] : '';
+        $labelFor = '';
+        $args = $field['args'] ?? [];
+        if (is_array($args) && isset($args['label_for'])) {
+            $labelFor = (string) $args['label_for'];
+        }
+
+        echo '<div' . ($wrapperId !== '' ? ' id="' . esc_attr($wrapperId) . '"' : '') . ' class="axs4all-settings-field">';
+
+        if (! empty($field['title'])) {
+            $labelAttributes = $labelFor !== '' ? ' for="' . esc_attr($labelFor) . '"' : '';
+            echo '<label class="axs4all-settings-label"' . $labelAttributes . '>' . esc_html((string) $field['title']) . '</label>';
+        }
+
+        $callback = $field['callback'];
+
+        if ($this->callbackAcceptsArgs($callback)) {
+            call_user_func($callback, $args);
+        } else {
+            call_user_func($callback);
+        }
+
+        echo '</div>';
+    }
+
+    /**
+     * @param callable $callback
+     */
+    private function callbackAcceptsArgs(callable $callback): bool
+    {
+        try {
+            if (is_array($callback)) {
+                $ref = new \ReflectionMethod($callback[0], $callback[1]);
+            } elseif (is_string($callback) && strpos($callback, '::') !== false) {
+                $ref = new \ReflectionMethod($callback);
+            } else {
+                $ref = new \ReflectionFunction($callback);
+            }
+
+            return $ref->getNumberOfParameters() > 0;
+        } catch (\ReflectionException $exception) {
+            return true;
+        }
     }
 }
