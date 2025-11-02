@@ -117,6 +117,18 @@
     min-width: 150px;
     text-align: left;
 }
+.axs4all-smallbox-headline {
+    font-size: 1.6rem;
+    font-weight: 600;
+    margin: 0;
+    line-height: 1.2;
+}
+.axs4all-smallbox-subtitle {
+    display: block;
+    font-size: 0.95rem;
+    margin: 0.35rem 0;
+    font-weight: 500;
+}
 .callout.callout-warning h5 {
     margin-top: 0;
 }

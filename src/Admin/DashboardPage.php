@@ -80,10 +80,10 @@ final class DashboardPage
                         <?php endif; ?>
 
                         <div class="row">
-                            <?php $this->renderSmallBox(__('Pending Crawl URLs', 'axs4all-ai'), $crawlPending, 'bg-info', 'fa fa-globe'); ?>
-                            <?php $this->renderSmallBox(__('Pending Classifications', 'axs4all-ai'), $classificationPending, 'bg-success', 'fa fa-robot'); ?>
-                            <?php $this->renderSmallBox(__('Next Crawl', 'axs4all-ai'), $this->formatScheduleSummary($nextCrawl), 'bg-warning', 'fa fa-clock'); ?>
-                            <?php $this->renderSmallBox(__('Next Classification', 'axs4all-ai'), $this->formatScheduleSummary($nextClassification), 'bg-danger', 'fa fa-stream'); ?>
+                            <?php $this->renderSmallBox(__('Pending Crawl URLs', 'axs4all-ai'), (string) number_format_i18n($crawlPending), 'bg-info', 'fa fa-globe'); ?>
+                            <?php $this->renderSmallBox(__('Pending Classifications', 'axs4all-ai'), (string) number_format_i18n($classificationPending), 'bg-success', 'fa fa-robot'); ?>
+                            <?php $this->renderScheduleBox(__('Next Crawl', 'axs4all-ai'), $nextCrawl, 'bg-warning', 'fa fa-clock'); ?>
+                            <?php $this->renderScheduleBox(__('Next Classification', 'axs4all-ai'), $nextClassification, 'bg-danger', 'fa fa-stream'); ?>
                         </div>
 
                         <div class="row">
@@ -182,7 +182,27 @@ final class DashboardPage
         <div class="col-lg-3 col-6">
             <div class="small-box <?php echo esc_attr($colorClass); ?>">
                 <div class="inner">
-                    <h3><?php echo esc_html(is_string($value) ? $value : number_format_i18n((int) $value)); ?></h3>
+                    <h3 class="axs4all-smallbox-headline"><?php echo esc_html(is_string($value) ? $value : number_format_i18n((int) $value)); ?></h3>
+                    <p><?php echo esc_html($label); ?></p>
+                </div>
+                <div class="icon">
+                    <i class="<?php echo esc_attr($icon); ?>"></i>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+
+    private function renderScheduleBox(string $label, $timestamp, string $colorClass, string $icon): void
+    {
+        $summary = $this->formatScheduleSummary($timestamp);
+
+        ?>
+        <div class="col-lg-3 col-6">
+            <div class="small-box <?php echo esc_attr($colorClass); ?>">
+                <div class="inner">
+                    <h3 class="axs4all-smallbox-headline"><?php echo esc_html($summary['primary']); ?></h3>
+                    <span class="axs4all-smallbox-subtitle"><?php echo esc_html($summary['secondary']); ?></span>
                     <p><?php echo esc_html($label); ?></p>
                 </div>
                 <div class="icon">
@@ -207,16 +227,34 @@ final class DashboardPage
         return gmdate('M j, H:i', $time) . ' UTC';
     }
 
-    private function formatScheduleSummary($timestamp): string
+    /**
+     * @param int|false|null $timestamp
+     * @return array{primary:string,secondary:string}
+     */
+    private function formatScheduleSummary($timestamp): array
     {
         if ($timestamp === false || $timestamp === null) {
-            return __('Not scheduled', 'axs4all-ai');
+            return [
+                'primary' => __('Not scheduled', 'axs4all-ai'),
+                'secondary' => __('Schedule the cron hook to resume automatic processing.', 'axs4all-ai'),
+            ];
         }
 
-        $absolute = gmdate('M j, H:i', (int) $timestamp) . ' UTC';
-        $diff = human_time_diff(time(), (int) $timestamp);
+        $format = trim(get_option('date_format', 'M j') . ' ' . get_option('time_format', 'H:i'));
+        $localTime = wp_date($format, (int) $timestamp);
 
-        return sprintf('%1$s (%2$s)', $absolute, $diff);
+        $now = current_time('timestamp');
+        $target = (int) $timestamp;
+        $diffHuman = human_time_diff($now, $target);
+        $isFuture = $target >= $now;
+        $relative = $isFuture
+            ? sprintf(__('in %s', 'axs4all-ai'), $diffHuman)
+            : sprintf(__('%s ago', 'axs4all-ai'), $diffHuman);
+
+        return [
+            'primary' => $localTime,
+            'secondary' => $relative,
+        ];
     }
 
     /**
