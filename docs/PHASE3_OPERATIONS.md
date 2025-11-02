@@ -41,4 +41,17 @@ When “PagerDuty Events API” is selected, the plugin posts to `https://events
 4. Check **axs4all AI → Debug Log** to confirm alerts appear under *Alert Activity* when thresholds are crossed.
 5. Ensure cron is running by verifying the next run timestamps on the queue/classification screens.
 
+### 6. Monitoring Hooks (Phase 4)
+
+Phase 4 introduced lightweight monitoring hooks so external observability platforms can ingest crawl/classification telemetry without polling the database directly. Each hook is a standard WordPress action:
+
+| Hook | Arguments | Notes |
+|------|-----------|-------|
+| `do_action( 'axs4all_ai_monitor_start', string $context, array $meta = [] )` | `context` is typically `crawl` or `classification`. Meta includes the trigger (`source` = `cron`/`cli`) and pre-run queue counts. Fires just before a runner begins work. |
+| `do_action( 'axs4all_ai_monitor_finish', string $context, array $meta = [] )` | Meta contains processed counts, post-run queue depth, and source. Fired after a runner completes (even through CLI). |
+| `do_action( 'axs4all_ai_monitor_failure', string $context, array $meta = [] )` | Emitted whenever a crawl/classification job fails. Meta includes `job_id`, `message`, and `retry` (`yes` / `no`). |
+| `do_action( 'axs4all_ai_monitor_metrics', string $type, array $meta = [] )` | Used for ad-hoc metrics snapshots. Current types include `crawl_queue` and `classification_queue` with `pending`/`processed` counts and the invocation source. |
+
+All events persist their state in the `axs4all_ai_monitor_state` option. Ops tooling can read the complete snapshot via `\Axs4allAi\Infrastructure\Monitor::getState()` and map it into dashboards (Grafana, Datadog, etc.). The new Admin dashboard surfaces this information in real time, but external systems can subscribe to the same hooks to push data into pipelines or alerting frameworks.
+
 </details>
