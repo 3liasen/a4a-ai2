@@ -118,7 +118,7 @@ final class QueueRepository
     {
         $limit = max(1, $limit);
         $query = $this->wpdb->prepare(
-            "SELECT id, source_url, category, client_id, category_id, status, priority, attempts, crawl_subpages, created_at, updated_at
+            "SELECT id, source_url, category, client_id, category_id, status, priority, attempts, crawl_subpages, created_at, updated_at, last_attempted_at, last_error
              FROM {$this->table}
              ORDER BY created_at DESC
              LIMIT %d",

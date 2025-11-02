@@ -11,6 +11,7 @@ use Axs4allAi\Data\SnapshotRepository;
 
 final class QueuePage
 {
+    private const MAX_ATTEMPTS = 3;
     private QueueRepository $repository;
     private ClientRepository $clients;
     private CategoryRepository $categories;
@@ -66,13 +67,40 @@ final class QueuePage
         $cronStatus = $this->gatherCronStatus();
 
         ?>
+        <style>
+            .axs4all-status-badge {
+                display: inline-block;
+                padding: 2px 10px;
+                border-radius: 999px;
+                font-size: 12px;
+                font-weight: 600;
+                color: #fff;
+                line-height: 1.4;
+            }
+            .axs4all-status-pending { background: #21759b; }
+            .axs4all-status-processing { background: #6f42c1; }
+            .axs4all-status-completed { background: #2f855a; }
+            .axs4all-status-failed { background: #c53030; }
+            .axs4all-status-unknown { background: #4a5568; }
+            .axs4all-queue-meta {
+                margin-top: 4px;
+                font-size: 12px;
+                color: #555d66;
+            }
+            .axs4all-queue-error {
+                margin-top: 4px;
+                font-size: 12px;
+                color: #c53030;
+                max-width: 320px;
+            }
+        </style>
         <div class="wrap">
             <h1><?php esc_html_e('Crawl Queue', 'axs4all-ai'); ?></h1>
 
             <?php $this->renderNotice($message); ?>
             <?php if (! empty($cronStatus['next_missing'])) : ?>
                 <div class="notice notice-warning">
-                    <p><?php esc_html_e('The crawler cron event is not scheduled. Run “Run Crawl Now” or re-activate the plugin to restore scheduling.', 'axs4all-ai'); ?></p>
+                    <p><?php esc_html_e('The crawler cron event is not scheduled. Run ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œRun Crawl NowÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â or re-activate the plugin to restore scheduling.', 'axs4all-ai'); ?></p>
                 </div>
             <?php endif; ?>
 
@@ -141,7 +169,7 @@ final class QueuePage
                                 <?php esc_html_e('Manual category slug (optional)', 'axs4all-ai'); ?>
                             </label>
                             <input type="text" class="regular-text" name="queue_category" id="axs4all-ai-queue-category-slug" placeholder="<?php esc_attr_e('restaurant', 'axs4all-ai'); ?>">
-                            <p class="description"><?php esc_html_e('Use this if you need a category that is not yet configured above. Leave empty to fall back to “default”.', 'axs4all-ai'); ?></p>
+                            <p class="description"><?php esc_html_e('Use this if you need a category that is not yet configured above. Leave empty to fall back to ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œdefaultÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â.', 'axs4all-ai'); ?></p>
                         </td>
                     </tr>
                     <tr>
@@ -167,7 +195,6 @@ final class QueuePage
                         <th><?php esc_html_e('Subpages', 'axs4all-ai'); ?></th>
                         <th><?php esc_html_e('Status', 'axs4all-ai'); ?></th>
                         <th><?php esc_html_e('Priority', 'axs4all-ai'); ?></th>
-                        <th><?php esc_html_e('Attempts', 'axs4all-ai'); ?></th>
                         <th><?php esc_html_e('Created', 'axs4all-ai'); ?></th>
                         <th><?php esc_html_e('Updated', 'axs4all-ai'); ?></th>
                         <th><?php esc_html_e('Latest Snapshot', 'axs4all-ai'); ?></th>
@@ -177,20 +204,19 @@ final class QueuePage
                 <tbody>
                 <?php if (empty($recent)) : ?>
                     <tr>
-                        <td colspan="11"><?php esc_html_e('No queue items yet.', 'axs4all-ai'); ?></td>
+                        <td colspan="10"><?php esc_html_e('No queue items yet.', 'axs4all-ai'); ?></td>
                     </tr>
                 <?php else : ?>
                     <?php foreach ($recent as $item) : ?>
                         <tr>
                             <td><a href="<?php echo esc_url($item['source_url']); ?>" target="_blank" rel="noreferrer noopener"><?php echo esc_html($item['source_url']); ?></a></td>
-                            <td><?php echo esc_html($clientOptions[$item['client_id']] ?? '—'); ?></td>
+                            <td><?php echo esc_html($clientOptions[$item['client_id']] ?? 'N/A'); ?></td>
                             <td><?php echo esc_html($this->formatCategoryLabel($item, $categoryOptions)); ?></td>
                             <td><?php echo ! empty($item['crawl_subpages']) ? esc_html__('Yes', 'axs4all-ai') : esc_html__('No', 'axs4all-ai'); ?></td>
-                            <td><?php echo esc_html($item['status']); ?></td>
+                            <td><?php echo $this->renderStatusCell($item); ?></td>
                             <td><?php echo esc_html((string) $item['priority']); ?></td>
-                            <td><?php echo esc_html((string) $item['attempts']); ?></td>
-                            <td><?php echo esc_html($item['created_at']); ?></td>
-                        <td><?php echo esc_html($item['updated_at']); ?></td>
+                            <td><?php echo esc_html($this->formatSimpleDate($item['created_at'] ?? null)); ?></td>
+                            <td><?php echo esc_html($this->formatSimpleDate($item['updated_at'] ?? null)); ?></td>
                         <td>
                             <?php
                             $snapshot = $snapshotMap[$item['id']] ?? null;
@@ -600,7 +626,109 @@ final class QueuePage
             $options[(int) $client['id']] = (string) $client['name'];
         }
 
-        asort($options, SORT_NATURAL | SORT_FLAG_CASE);
+        
+    /**
+     * @param array<string, mixed> $item
+     */
+    private function renderStatusCell(array $item): string
+    {
+        $status = strtolower(trim((string) ($item['status'] ?? '')));
+        $map = [
+            'pending' => ['class' => 'pending', 'label' => __('Pending', 'axs4all-ai')],
+            'processing' => ['class' => 'processing', 'label' => __('Processing', 'axs4all-ai')],
+            'completed' => ['class' => 'completed', 'label' => __('Completed', 'axs4all-ai')],
+            'failed' => ['class' => 'failed', 'label' => __('Failed', 'axs4all-ai')],
+        ];
+        $badge = $map[$status] ?? ['class' => 'unknown', 'label' => __('Unknown', 'axs4all-ai')];
+
+        $attempts = max(0, (int) ($item['attempts'] ?? 0));
+        $attemptLabel = $attempts > 0
+            ? sprintf(
+                __('Attempt %1$d of %2$d', 'axs4all-ai'),
+                min($attempts, self::MAX_ATTEMPTS),
+                self::MAX_ATTEMPTS
+            )
+            : __('No attempts yet', 'axs4all-ai');
+
+        $lastAttempt = $this->formatDateWithDiff($item['last_attempted_at'] ?? null);
+        $metaParts = [$attemptLabel, sprintf(__('Last attempt: %s', 'axs4all-ai'), $lastAttempt)];
+
+        $errorText = $this->trimError($item['last_error'] ?? null);
+
+        ob_start();
+        ?>
+        <span class="axs4all-status-badge <?php echo esc_attr('axs4all-status-' . $badge['class']); ?>">
+            <?php echo esc_html($badge['label']); ?>
+        </span>
+        <div class="axs4all-queue-meta"><?php echo esc_html(implode(' ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ ', $metaParts)); ?></div>
+        <?php if ($errorText !== '') : ?>
+            <div class="axs4all-queue-error"><?php echo esc_html($errorText); ?></div>
+        <?php endif; ?>
+        <?php
+        return trim((string) ob_get_clean());
+    }
+
+    private function formatSimpleDate(?string $value): string
+    {
+        if ($value === null || $value === '') {
+            return __('n/a', 'axs4all-ai');
+        }
+
+        $timestamp = strtotime($value);
+        if ($timestamp === false) {
+            return $value;
+        }
+
+        return wp_date(get_option('date_format', 'M j') . ' ' . get_option('time_format', 'H:i'), $timestamp);
+    }
+
+    private function formatDateWithDiff(?string $value): string
+    {
+        if ($value === null || $value === '') {
+            return __('Never', 'axs4all-ai');
+        }
+
+        $timestamp = strtotime($value);
+        if ($timestamp === false) {
+            return $value;
+        }
+
+        $formatted = wp_date(get_option('date_format', 'M j') . ' ' . get_option('time_format', 'H:i'), $timestamp);
+        $now = current_time('timestamp');
+        if ($now <= 0) {
+            return $formatted;
+        }
+
+        $diff = human_time_diff($timestamp, $now);
+        if ($timestamp > $now) {
+            $relative = sprintf(__('in %s', 'axs4all-ai'), $diff);
+        } else {
+            $relative = sprintf(__('%s ago', 'axs4all-ai'), $diff);
+        }
+
+        return sprintf('%1$s ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· %2$s', $formatted, $relative);
+    }
+
+    private function trimError(?string $error): string
+    {
+        if ($error === null) {
+            return '';
+        }
+
+        $error = preg_replace('/\s+/', ' ', trim($error)) ?? '';
+        if ($error === '') {
+            return '';
+        }
+
+        $limit = 160;
+        if (function_exists('mb_strlen') ? mb_strlen($error) > $limit : strlen($error) > $limit) {
+            $slice = function_exists('mb_substr') ? mb_substr($error, 0, $limit - 1) : substr($error, 0, $limit - 1);
+            return $slice . 'ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦';
+        }
+
+        return $error;
+    }
+asort($options, SORT_NATURAL | SORT_FLAG_CASE);
 
         return $options;
     }
@@ -681,5 +809,6 @@ final class QueuePage
         return $slug !== '' ? $slug : 'default';
     }
 }
+
 
 

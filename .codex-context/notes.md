@@ -1572,3 +1572,4 @@ I’m sorry about that. I don’t have any automatic way to know when you upgrad
 - Latest crawl/classification repos support `hour` granularity for billing stats.
 - Outstanding: finish Phase 4 Part 1 polish (dashboard/billing testing), tighten crawler retry/log work, and plan Phase 4 Part 2 deliverables.
 - Queue runner now tracks attempts with exponential retry, marks queue items as processing/completed/failed, and pushes crawl failures into the debug log; pending items surface recent `last_error` metadata in the admin queue list. Next monitoring tasks: pipe crawl/classification alert events into Graphite/Grafana (or chosen stack), expose cron heartbeat metrics via WP-Cron hooks, and align dashboard callouts with new queue status data.
+- Queue admin screen now surfaces status badges (pending/processing/completed/failed), retry counts, last-attempt timing, and recent error snippets, using the new queue repository fields.
