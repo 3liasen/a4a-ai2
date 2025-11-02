@@ -138,7 +138,7 @@ final class QueueRepository
     {
         $limit = max(1, $limit);
         $query = $this->wpdb->prepare(
-            "SELECT id, source_url, category, client_id, category_id, crawl_subpages
+            "SELECT id, source_url, category, client_id, category_id, crawl_subpages, attempts, last_error
              FROM {$this->table}
              WHERE status = %s
              ORDER BY priority ASC, created_at ASC
@@ -196,6 +196,98 @@ final class QueueRepository
         $deleted = $this->wpdb->delete($this->table, ['id' => $id], ['%d']);
 
         return $deleted !== false;
+    }
+
+    public function markInProgress(int $id): bool
+    {
+        if ($id <= 0) {
+            return false;
+        }
+
+        $now = current_time('mysql');
+        $result = $this->wpdb->query(
+            $this->wpdb->prepare(
+                "UPDATE {$this->table}
+                 SET attempts = attempts + 1,
+                     status = %s,
+                     last_attempted_at = %s,
+                     updated_at = %s
+                 WHERE id = %d",
+                'processing',
+                $now,
+                $now,
+                $id
+            )
+        );
+
+        return $result !== false;
+    }
+
+    public function markCompleted(int $id): bool
+    {
+        if ($id <= 0) {
+            return false;
+        }
+
+        $now = current_time('mysql');
+        $updated = $this->wpdb->query(
+            $this->wpdb->prepare(
+                "UPDATE {$this->table}
+                 SET status = %s,
+                     last_error = NULL,
+                     updated_at = %s
+                 WHERE id = %d",
+                'completed',
+                $now,
+                $id
+            )
+        );
+
+        return $updated !== false;
+    }
+
+    public function markFailed(int $id, string $errorMessage, bool $retry = true): bool
+    {
+        if ($id <= 0) {
+            return false;
+        }
+
+        $errorMessage = sanitize_text_field(wp_strip_all_tags($errorMessage));
+        if ($errorMessage !== '') {
+            $errorMessage = mb_substr($errorMessage, 0, 500);
+        }
+
+        $status = $retry ? 'pending' : 'failed';
+        $now = current_time('mysql');
+
+        if ($errorMessage === '') {
+            $query = $this->wpdb->prepare(
+                "UPDATE {$this->table}
+                 SET status = %s,
+                     last_error = NULL,
+                     updated_at = %s
+                 WHERE id = %d",
+                $status,
+                $now,
+                $id
+            );
+        } else {
+            $query = $this->wpdb->prepare(
+                "UPDATE {$this->table}
+                 SET status = %s,
+                     last_error = %s,
+                     updated_at = %s
+                 WHERE id = %d",
+                $status,
+                $errorMessage,
+                $now,
+                $id
+            );
+        }
+
+        $updated = $this->wpdb->query($query);
+
+        return $updated !== false;
     }
 
     public function normalizeUrl(string $url): ?string

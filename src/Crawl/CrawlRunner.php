@@ -15,6 +15,7 @@ use Axs4allAi\Infrastructure\DebugLogger;
 
 final class CrawlRunner
 {
+    private const MAX_ATTEMPTS = 3;
     private QueueRepository $repository;
     private ?PromptRepository $promptRepository;
     private ?ClassificationQueueRepository $classificationQueue;
@@ -551,6 +552,23 @@ final class CrawlRunner
     /**
      * @param array<string, scalar|null> $context
      */
+    private function handleFailure(int $queueId, string $message, int $attemptNumber, array $context = [], bool $retryable = true): void
+    {
+        $retry = $retryable && $attemptNumber < self::MAX_ATTEMPTS;
+        $context = array_merge($context, [
+            'queue_id' => $queueId,
+            'attempt' => $attemptNumber,
+            'will_retry' => $retry ? 'yes' : 'no',
+        ]);
+
+        error_log(sprintf('[axs4all-ai] Crawl failure on #%d: %s (attempt %d)', $queueId, $message, $attemptNumber));
+        $this->log($retry ? 'crawl_warning' : 'crawl_error', $message, $context);
+        $this->repository->markFailed($queueId, $message, $retry);
+    }
+
+    /**
+     * @param array<string, scalar|null> $context
+     */
     private function log(string $type, string $message, array $context = []): void
     {
         if (! $this->logger instanceof DebugLogger) {
@@ -560,3 +578,4 @@ final class CrawlRunner
         $this->logger->record($type, $message, $context);
     }
 }
+
