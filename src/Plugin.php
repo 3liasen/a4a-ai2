@@ -35,6 +35,7 @@ use Axs4allAi\Infrastructure\ExchangeRateUpdater;
 use Axs4allAi\Infrastructure\DebugLogger;
 use Axs4allAi\Infrastructure\AlertManager;
 use Axs4allAi\Infrastructure\HealthMonitor;
+use Axs4allAi\Infrastructure\Monitor;
 
 final class Plugin
 {
@@ -55,6 +56,7 @@ final class Plugin
     private DebugLogger $debugLogger;
     private AlertManager $alertManager;
     private HealthMonitor $healthMonitor;
+    private Monitor $monitor;
     private array $settings;
     private string $version;
     public function __construct()
@@ -72,6 +74,7 @@ final class Plugin
         $this->exchangeRateUpdater = new ExchangeRateUpdater();
         $this->debugLogger = new DebugLogger();
         $this->alertManager = new AlertManager($this->debugLogger);
+        $this->monitor = new Monitor($this->debugLogger);
         $this->settings = $this->loadSettings();
         $apiKey = $this->resolveApiKey();
         $this->aiClient = new OpenAiClient(
@@ -132,6 +135,7 @@ final class Plugin
         $this->classificationScheduler->register();
         $this->exchangeRateUpdater->register();
         $this->healthMonitor->register();
+        $this->monitor->register();
         $this->registerCliCommands();
     }
 

@@ -55,8 +55,27 @@ final class CrawlScheduler
 
     public function processCron(): void
     {
-        $this->runner->run();
+        $pendingBefore = $this->repository->countPending();
+        do_action('axs4all_ai_monitor_start', 'crawl', [
+            'source' => 'cron',
+            'pending_before' => $pendingBefore,
+        ]);
+
+        $processed = $this->runner->run();
         update_option('axs4all_ai_last_crawl', current_time('mysql', true));
+
+        $pendingAfter = $this->repository->countPending();
+        do_action('axs4all_ai_monitor_finish', 'crawl', [
+            'source' => 'cron',
+            'processed' => $processed,
+            'pending_after' => $pendingAfter,
+        ]);
+
+        do_action('axs4all_ai_monitor_metrics', 'crawl_queue', [
+            'source' => 'cron',
+            'pending' => $pendingAfter,
+            'processed' => $processed,
+        ]);
     }
 
     /**
@@ -65,9 +84,30 @@ final class CrawlScheduler
     public function processCli(array $args = [], array $assocArgs = []): void
     {
         $batch = isset($assocArgs['batch']) ? (int) $assocArgs['batch'] : 5;
-        $this->runner->run($batch);
+        $pendingBefore = $this->repository->countPending();
+        do_action('axs4all_ai_monitor_start', 'crawl', [
+            'source' => 'cli',
+            'batch' => $batch,
+            'pending_before' => $pendingBefore,
+        ]);
+
+        $processed = $this->runner->run($batch);
+        $pendingAfter = $this->repository->countPending();
+
+        do_action('axs4all_ai_monitor_finish', 'crawl', [
+            'source' => 'cli',
+            'processed' => $processed,
+            'pending_after' => $pendingAfter,
+        ]);
+
+        do_action('axs4all_ai_monitor_metrics', 'crawl_queue', [
+            'source' => 'cli',
+            'pending' => $pendingAfter,
+            'processed' => $processed,
+        ]);
+
         if (class_exists('\WP_CLI')) {
-            \WP_CLI::success(sprintf('Crawler stub executed with batch size %d.', $batch));
+            \WP_CLI::success(sprintf('Crawler executed (batch %d, processed %d).', $batch, $processed));
         }
     }
 }

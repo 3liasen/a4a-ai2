@@ -303,6 +303,12 @@ final class ClassificationRunner
                 $reason
             )
         );
+
+        do_action('axs4all_ai_monitor_failure', 'classification', [
+            'job_id' => $jobId,
+            'message' => $reason,
+            'retry' => $retry ? 'yes' : 'no',
+        ]);
     }
 
     /**

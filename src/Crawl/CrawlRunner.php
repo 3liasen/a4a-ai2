@@ -52,10 +52,11 @@ final class CrawlRunner
         $this->logger = $logger;
     }
 
-    public function run(int $batchSize = 5): void
+    public function run(int $batchSize = 5): int
     {
         $this->seenHashes = [];
         $this->seenUrls = [];
+        $processedCount = 0;
 
         $pendingCount = $this->repository->countPending();
         error_log(sprintf('[axs4all-ai] Crawl runner starting. Pending items: %d.', $pendingCount));
@@ -82,6 +83,7 @@ final class CrawlRunner
                 'client_id' => $queueClientId,
                 'crawl_subpages' => $crawlSubpages,
             ]);
+            ++$processedCount;
 
             $client = $this->resolveClient($queueClientId, $rootUrl);
             $clientId = $client !== null && isset($client['id']) ? (int) $client['id'] : ($queueClientId > 0 ? $queueClientId : null);
@@ -199,7 +201,8 @@ final class CrawlRunner
         }
 
         error_log('[axs4all-ai] Crawl runner finished.');
-        $this->log('crawl_finished', 'Crawl runner finished');
+        $this->log('crawl_finished', 'Crawl runner finished', ['processed' => $processedCount]);
+        return $processedCount;
     }
 
     /** @param array<string, mixed>|null $client */
@@ -563,6 +566,9 @@ final class CrawlRunner
 
         error_log(sprintf('[axs4all-ai] Crawl failure on #%d: %s (attempt %d)', $queueId, $message, $attemptNumber));
         $this->log($retry ? 'crawl_warning' : 'crawl_error', $message, $context);
+        do_action('axs4all_ai_monitor_failure', 'crawl', array_merge($context, [
+            'message' => $message,
+        ]));
         $this->repository->markFailed($queueId, $message, $retry);
     }
 

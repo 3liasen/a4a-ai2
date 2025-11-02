@@ -69,6 +69,18 @@ final class ClassificationQueueRepository
         return (int) $this->wpdb->insert_id;
     }
 
+    public function countPending(): int
+    {
+        $query = $this->wpdb->prepare(
+            "SELECT COUNT(*) FROM {$this->queueTable} WHERE status = %s",
+            self::STATUS_PENDING
+        );
+
+        $result = $this->wpdb->get_var($query);
+
+        return $result !== null ? (int) $result : 0;
+    }
+
     /**
      * @return array<int, array<string, mixed>>
      */

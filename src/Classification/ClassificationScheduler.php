@@ -60,8 +60,28 @@ final class ClassificationScheduler
 
     public function processCron(): void
     {
-        $this->runBatch($this->defaultBatchSize);
+        $pendingBefore = $this->queueRepository->countPending();
+        do_action('axs4all_ai_monitor_start', 'classification', [
+            'source' => 'cron',
+            'pending_before' => $pendingBefore,
+            'batch' => $this->defaultBatchSize,
+        ]);
+
+        $processed = $this->runBatch($this->defaultBatchSize);
         update_option('axs4all_ai_last_classification', current_time('mysql', true));
+
+        $pendingAfter = $this->queueRepository->countPending();
+        do_action('axs4all_ai_monitor_finish', 'classification', [
+            'source' => 'cron',
+            'processed' => $processed,
+            'pending_after' => $pendingAfter,
+        ]);
+
+        do_action('axs4all_ai_monitor_metrics', 'classification_queue', [
+            'source' => 'cron',
+            'pending' => $pendingAfter,
+            'processed' => $processed,
+        ]);
     }
 
     /**
@@ -71,6 +91,12 @@ final class ClassificationScheduler
     {
         $batch = isset($assocArgs['batch']) ? max(1, (int) $assocArgs['batch']) : $this->defaultBatchSize;
         $drain = isset($assocArgs['drain']);
+
+        do_action('axs4all_ai_monitor_start', 'classification', [
+            'source' => 'cli',
+            'batch' => $batch,
+            'drain' => $drain ? 'yes' : 'no',
+        ]);
 
         $totalProcessed = 0;
         do {
@@ -87,6 +113,19 @@ final class ClassificationScheduler
         }
 
         update_option('axs4all_ai_last_classification', current_time('mysql', true));
+        $pendingAfter = $this->queueRepository->countPending();
+
+        do_action('axs4all_ai_monitor_finish', 'classification', [
+            'source' => 'cli',
+            'processed' => $totalProcessed,
+            'pending_after' => $pendingAfter,
+        ]);
+
+        do_action('axs4all_ai_monitor_metrics', 'classification_queue', [
+            'source' => 'cli',
+            'pending' => $pendingAfter,
+            'processed' => $totalProcessed,
+        ]);
     }
 
     private function runBatch(?int $batchSize = null): int
