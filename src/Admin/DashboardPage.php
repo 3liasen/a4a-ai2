@@ -51,6 +51,8 @@ final class DashboardPage
         $lastClassification = (string) get_option('axs4all_ai_last_classification', '');
 
         $recentAlerts = get_option('axs4all_ai_alert_state', []);
+        $cronWarnings = $this->collectCronWarnings($nextCrawl, $nextClassification);
+        $hasWarnings = ! empty($cronWarnings);
 
         ?>
         <div class="wrap axs4all-adminlte">
@@ -67,11 +69,59 @@ final class DashboardPage
 
                 <section class="content">
                     <div class="container-fluid">
+                        <?php if ($hasWarnings) : ?>
+                            <div class="row">
+                                <div class="col-12">
+                                    <?php foreach ($cronWarnings as $warning) : ?>
+                                        <?php $this->renderCallout('warning', $warning['title'], $warning['message']); ?>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+
                         <div class="row">
                             <?php $this->renderSmallBox(__('Pending Crawl URLs', 'axs4all-ai'), $crawlPending, 'bg-info', 'fa fa-globe'); ?>
                             <?php $this->renderSmallBox(__('Pending Classifications', 'axs4all-ai'), $classificationPending, 'bg-success', 'fa fa-robot'); ?>
-                            <?php $this->renderSmallBox(__('Next Crawl', 'axs4all-ai'), $this->formatTimestamp($nextCrawl), 'bg-warning', 'fa fa-clock'); ?>
-                            <?php $this->renderSmallBox(__('Next Classification', 'axs4all-ai'), $this->formatTimestamp($nextClassification), 'bg-danger', 'fa fa-stream'); ?>
+                            <?php $this->renderSmallBox(__('Next Crawl', 'axs4all-ai'), $this->formatScheduleSummary($nextCrawl), 'bg-warning', 'fa fa-clock'); ?>
+                            <?php $this->renderSmallBox(__('Next Classification', 'axs4all-ai'), $this->formatScheduleSummary($nextClassification), 'bg-danger', 'fa fa-stream'); ?>
+                        </div>
+
+                        <div class="row">
+                            <section class="col-lg-6 connectedSortable">
+                                <div class="card card-outline card-light">
+                                    <div class="card-header">
+                                        <h3 class="card-title"><?php esc_html_e('Quick Actions', 'axs4all-ai'); ?></h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="axs4all-dashboard-actions">
+                                            <?php foreach ($this->getQuickLinks() as $link) : ?>
+                                                <a class="btn btn-app" href="<?php echo esc_url($link['href']); ?>">
+                                                    <i class="<?php echo esc_attr($link['icon']); ?>"></i> <?php echo esc_html($link['label']); ?>
+                                                </a>
+                                            <?php endforeach; ?>
+                                        </div>
+                                        <p class="description">
+                                            <?php esc_html_e('Jump straight to daily ops pages for crawl management, classifications, and usage insights.', 'axs4all-ai'); ?>
+                                        </p>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="col-lg-6 connectedSortable">
+                                <div class="card card-outline card-info">
+                                    <div class="card-header">
+                                        <h3 class="card-title"><?php esc_html_e('Cron Schedules', 'axs4all-ai'); ?></h3>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <table class="table table-hover mb-0">
+                                            <tbody>
+                                                <?php $this->renderScheduleRow(__('Crawler', 'axs4all-ai'), $nextCrawl); ?>
+                                                <?php $this->renderScheduleRow(__('Classification Runner', 'axs4all-ai'), $nextClassification); ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </section>
                         </div>
 
                         <div class="row">
@@ -143,15 +193,6 @@ final class DashboardPage
         <?php
     }
 
-    private function formatTimestamp($timestamp): string
-    {
-        if ($timestamp === false || $timestamp === null) {
-            return __('n/a', 'axs4all-ai');
-        }
-
-        return gmdate('M j, H:i', (int) $timestamp) . ' UTC';
-    }
-
     private function formatSavedTime(string $value): string
     {
         if ($value === '') {
@@ -164,5 +205,99 @@ final class DashboardPage
         }
 
         return gmdate('M j, H:i', $time) . ' UTC';
+    }
+
+    private function formatScheduleSummary($timestamp): string
+    {
+        if ($timestamp === false || $timestamp === null) {
+            return __('Not scheduled', 'axs4all-ai');
+        }
+
+        $absolute = gmdate('M j, H:i', (int) $timestamp) . ' UTC';
+        $diff = human_time_diff(time(), (int) $timestamp);
+
+        return sprintf('%1$s (%2$s)', $absolute, $diff);
+    }
+
+    /**
+     * @return array<int, array{href:string,label:string,icon:string}>
+     */
+    private function getQuickLinks(): array
+    {
+        return [
+            [
+                'href' => admin_url('admin.php?page=axs4all-ai-queue'),
+                'label' => __('Crawl Queue', 'axs4all-ai'),
+                'icon' => 'fas fa-route',
+            ],
+            [
+                'href' => admin_url('admin.php?page=axs4all-ai-classifications'),
+                'label' => __('Classification Results', 'axs4all-ai'),
+                'icon' => 'fas fa-clipboard-check',
+            ],
+            [
+                'href' => admin_url('admin.php?page=axs4all-ai-billing'),
+                'label' => __('Usage & Costs', 'axs4all-ai'),
+                'icon' => 'fas fa-chart-line',
+            ],
+            [
+                'href' => admin_url('admin.php?page=axs4all-ai-manual'),
+                'label' => __('Manual Classification', 'axs4all-ai'),
+                'icon' => 'fas fa-magic',
+            ],
+        ];
+    }
+
+    private function renderScheduleRow(string $label, $timestamp): void
+    {
+        $isScheduled = $timestamp !== false && $timestamp !== null;
+        $statusClass = $isScheduled ? 'badge-success' : 'badge-danger';
+        $statusText = $isScheduled ? __('Scheduled', 'axs4all-ai') : __('Missing', 'axs4all-ai');
+
+        ?>
+        <tr>
+            <th scope="row"><?php echo esc_html($label); ?></th>
+            <td>
+                <span class="badge <?php echo esc_attr($statusClass); ?>"><?php echo esc_html($statusText); ?></span>
+            </td>
+            <td><?php echo esc_html($this->formatScheduleSummary($timestamp)); ?></td>
+        </tr>
+        <?php
+    }
+
+    /**
+     * @param int|false|null $nextCrawl
+     * @param int|false|null $nextClassification
+     * @return array<int, array{title:string,message:string}>
+     */
+    private function collectCronWarnings($nextCrawl, $nextClassification): array
+    {
+        $warnings = [];
+
+        if ($nextCrawl === false || $nextCrawl === null) {
+            $warnings[] = [
+                'title' => __('Crawler is not scheduled', 'axs4all-ai'),
+                'message' => __('The crawler cron hook has no upcoming run. Check WP-Cron settings or schedule it manually from the Crawl Queue screen.', 'axs4all-ai'),
+            ];
+        }
+
+        if ($nextClassification === false || $nextClassification === null) {
+            $warnings[] = [
+                'title' => __('Classification runner is not scheduled', 'axs4all-ai'),
+                'message' => __('The classification cron hook is missing a next run. Verify WP-Cron is working or trigger the runner manually to reschedule.', 'axs4all-ai'),
+            ];
+        }
+
+        return $warnings;
+    }
+
+    private function renderCallout(string $type, string $title, string $message): void
+    {
+        ?>
+        <div class="callout callout-<?php echo esc_attr($type); ?>">
+            <h5><?php echo esc_html($title); ?></h5>
+            <p><?php echo esc_html($message); ?></p>
+        </div>
+        <?php
     }
 }

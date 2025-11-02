@@ -107,3 +107,16 @@
 .axs4all-ai-hourly-chart .description {
     margin: 0;
 }
+.axs4all-dashboard-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+.axs4all-dashboard-actions .btn-app {
+    min-width: 150px;
+    text-align: left;
+}
+.callout.callout-warning h5 {
+    margin-top: 0;
+}
