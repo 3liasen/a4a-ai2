@@ -179,7 +179,7 @@ final class QueuePage
                 </div>
             <?php endif; ?>
 
-            <div class="row axs4all-queue-row">
+            <div class="axs4all-queue-row">
                 <section class="col-xl-4 col-lg-5 col-md-6">
                     <div class="card card-primary card-outline axs4all-queue-card h-100">
                         <div class="card-header">
@@ -210,8 +210,8 @@ final class QueuePage
                 </section>
             </div>
 
-            <div class="row axs4all-queue-row">
-                <section class="col-12">
+            <div class="axs4all-queue-row">
+                <section class="axs4all-queue-col">
                     <div class="card card-outline card-light axs4all-queue-card">
                         <div class="card-header">
                             <h2 class="card-title m-0"><?php esc_html_e('Recent Queue Items', 'axs4all-ai'); ?></h2>
@@ -297,8 +297,8 @@ final class QueuePage
                 </section>
             </div>
 
-            <div class="row axs4all-queue-row">
-                <section class="col-xl-6 col-lg-7">
+            <div class="axs4all-queue-row">
+                <section class="axs4all-queue-col">
                     <div class="card card-outline card-light axs4all-queue-card h-100">
                         <div class="card-header">
                             <h2 class="card-title m-0"><?php esc_html_e('Client URLs', 'axs4all-ai'); ?></h2>
@@ -441,8 +441,8 @@ final class QueuePage
             </table>
         </div>
 
-        <div class="row axs4all-queue-row">
-            <section class="col-xl-6 col-lg-7">
+        <div class="axs4all-queue-row">
+            <section class="axs4all-queue-col">
                 <div class="card card-outline card-light axs4all-queue-card h-100">
                     <div class="card-header">
                         <h2 class="card-title m-0"><?php esc_html_e('Add manual URL to Queue', 'axs4all-ai'); ?></h2>
