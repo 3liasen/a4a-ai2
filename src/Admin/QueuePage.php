@@ -171,17 +171,20 @@ final class QueuePage
                 cursor: pointer;
                 display: flex;
                 align-items: center;
-                justify-content: space-between;
+                justify-content: flex-start;
             }
             .axs4all-card-collapsible .card-header h2 {
                 display: inline-flex;
                 align-items: center;
                 gap: 0.5rem;
+                flex: 1 1 auto;
+                margin: 0;
             }
             .axs4all-card-collapsible .axs4all-collapse-indicator {
                 transition: transform 0.2s ease-in-out;
                 font-size: 16px;
                 color: #6b7280;
+                margin-left: auto;
             }
             .axs4all-card-collapsible.is-collapsed .card-body {
                 display: none;
