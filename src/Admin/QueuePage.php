@@ -167,6 +167,28 @@ final class QueuePage
                 align-items: center;
                 gap: 0.5rem;
             }
+            .axs4all-card-collapsible .card-header {
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+            .axs4all-card-collapsible .card-header h2 {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+            .axs4all-card-collapsible .axs4all-collapse-indicator {
+                transition: transform 0.2s ease-in-out;
+                font-size: 16px;
+                color: #6b7280;
+            }
+            .axs4all-card-collapsible.is-collapsed .card-body {
+                display: none;
+            }
+            .axs4all-card-collapsible.is-collapsed .axs4all-collapse-indicator {
+                transform: rotate(-90deg);
+            }
         </style>
         <div class="wrap axs4all-queue-layout">
             <h1><?php esc_html_e('Crawl Queue', 'axs4all-ai'); ?></h1>
@@ -362,13 +384,16 @@ final class QueuePage
                 </section>
             </div>
 
-            <div class="axs4all-queue-row">
+            <div class="axs4all-queue-row" id="axs4all-manual-queue-card">
                 <section class="axs4all-queue-col">
-                    <div class="card card-outline card-light axs4all-queue-card h-100">
-                        <div class="card-header">
-                            <h2 class="card-title m-0"><?php esc_html_e('Add manual URL to Queue', 'axs4all-ai'); ?></h2>
+                    <div class="card card-outline card-light axs4all-queue-card h-100 axs4all-card-collapsible is-collapsed">
+                        <div class="card-header" role="button" tabindex="0" aria-expanded="false" aria-controls="axs4all-manual-card-body">
+                            <h2 class="card-title m-0">
+                                <?php esc_html_e('Add manual URL to Queue', 'axs4all-ai'); ?>
+                            </h2>
+                            <span class="axs4all-collapse-indicator dashicons dashicons-arrow-down-alt2" aria-hidden="true"></span>
                         </div>
-                        <div class="card-body axs4all-card-body-tight">
+                        <div class="card-body axs4all-card-body-tight" id="axs4all-manual-card-body">
                             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="axs4all-manual-form">
                                 <?php wp_nonce_field('axs4all_ai_add_queue'); ?>
                                 <input type="hidden" name="action" value="axs4all_ai_add_queue" />
@@ -425,6 +450,28 @@ final class QueuePage
                     </div>
                 </section>
             </div>
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    var cards = document.querySelectorAll('.axs4all-card-collapsible');
+                    cards.forEach(function (card) {
+                        var header = card.querySelector('.card-header');
+                        if (! header) {
+                            return;
+                        }
+                        var toggle = function () {
+                            var collapsed = card.classList.toggle('is-collapsed');
+                            header.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+                        };
+                        header.addEventListener('click', toggle);
+                        header.addEventListener('keydown', function (event) {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                toggle();
+                            }
+                        });
+                    });
+                });
+            </script>
         <?php
     }
 
