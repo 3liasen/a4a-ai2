@@ -11,6 +11,7 @@ use Axs4allAi\Infrastructure\Monitor;
 final class DashboardPage
 {
     private const MENU_SLUG = 'axs4all-ai';
+    private const STALE_THRESHOLD_MINUTES = 15;
 
     private QueueRepository $queueRepository;
     private ClassificationQueueRepository $classificationQueueRepository;
@@ -52,7 +53,7 @@ final class DashboardPage
         $lastClassification = (string) get_option('axs4all_ai_last_classification', '');
 
         $recentAlerts = get_option('axs4all_ai_alert_state', []);
-        $cronWarnings = $this->collectCronWarnings($nextCrawl, $nextClassification);
+        $cronWarnings = $this->collectCronWarnings($nextCrawl, $nextClassification, $lastCrawl, $lastClassification);
         $hasWarnings = ! empty($cronWarnings);
 
         $monitorState = Monitor::getState();
@@ -103,44 +104,57 @@ final class DashboardPage
                                                 <p><?php esc_html_e('No job telemetry recorded yet. Cron runners will populate this after their first execution.', 'axs4all-ai'); ?></p>
                                             <?php else : ?>
                                                 <div class="table-responsive">
-                                                    <table class="table table-sm table-striped axs4all-table-tight">
-                                                        <thead>
-                                                            <tr>
-                                                                <th><?php esc_html_e('Job', 'axs4all-ai'); ?></th>
-                                                                <th><?php esc_html_e('Status', 'axs4all-ai'); ?></th>
-                                                                <th><?php esc_html_e('Runs', 'axs4all-ai'); ?></th>
-                                                                <th><?php esc_html_e('Last finish', 'axs4all-ai'); ?></th>
-                                                                <th><?php esc_html_e('Last failure', 'axs4all-ai'); ?></th>
-                                                                <th><?php esc_html_e('Duration', 'axs4all-ai'); ?></th>
-                                                                <th><?php esc_html_e('Failures (consecutive)', 'axs4all-ai'); ?></th>
-                                                                <th><?php esc_html_e('Meta', 'axs4all-ai'); ?></th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            <?php foreach ($jobMonitors as $context => $entry) : ?>
+                                                      <table class="table table-sm table-striped axs4all-table-tight">
+                                                          <thead>
+                                                              <tr>
+                                                                  <th><?php esc_html_e('Job', 'axs4all-ai'); ?></th>
+                                                                  <th><?php esc_html_e('Status', 'axs4all-ai'); ?></th>
+                                                                  <th><?php esc_html_e('Runs', 'axs4all-ai'); ?></th>
+                                                                  <th><?php esc_html_e('Last start', 'axs4all-ai'); ?></th>
+                                                                  <th><?php esc_html_e('Last finish', 'axs4all-ai'); ?></th>
+                                                                  <th><?php esc_html_e('Last failure', 'axs4all-ai'); ?></th>
+                                                                  <th><?php esc_html_e('Duration', 'axs4all-ai'); ?></th>
+                                                                  <th><?php esc_html_e('Failures (consecutive)', 'axs4all-ai'); ?></th>
+                                                                  <th><?php esc_html_e('Last error', 'axs4all-ai'); ?></th>
+                                                                  <th><?php esc_html_e('Meta', 'axs4all-ai'); ?></th>
+                                                              </tr>
+                                                          </thead>
+                                                          <tbody>
+                                                              <?php foreach ($jobMonitors as $context => $entry) : ?>
                                                                 <?php
                                                                 $statusLabel = $this->formatMonitorStatus($entry);
                                                                 $statusClass = $this->monitorStatusClass($entry);
-                                                                $runs = isset($entry['run_count']) ? (int) $entry['run_count'] : 0;
-                                                                $lastFinish = isset($entry['last_finish']) ? $this->formatTimestamp((string) $entry['last_finish']) : __('n/a', 'axs4all-ai');
-                                                                $lastFailure = isset($entry['last_failure']) ? $this->formatTimestamp((string) $entry['last_failure']) : __('n/a', 'axs4all-ai');
-                                                                $duration = isset($entry['last_duration_ms']) ? $this->formatDurationMs($entry['last_duration_ms']) : __('n/a', 'axs4all-ai');
-                                                                $failures = isset($entry['failures_consecutive']) ? (int) $entry['failures_consecutive'] : 0;
-                                                                $meta = isset($entry['meta']) && is_array($entry['meta']) ? $this->formatMetaBadges($entry['meta']) : __('n/a', 'axs4all-ai');
-                                                                ?>
-                                                                <tr>
-                                                                    <th scope="row"><?php echo esc_html((string) $context); ?></th>
-                                                                    <td><span class="badge <?php echo esc_attr($statusClass); ?>"><?php echo esc_html($statusLabel); ?></span></td>
-                                                                    <td><?php echo esc_html(number_format_i18n($runs)); ?></td>
-                                                                    <td><?php echo esc_html($lastFinish); ?></td>
-                                                                    <td><?php echo esc_html($lastFailure); ?></td>
-                                                                    <td><?php echo esc_html($duration); ?></td>
-                                                                    <td><?php echo esc_html(number_format_i18n($failures)); ?></td>
-                                                                    <td><?php echo wp_kses_post($meta); ?></td>
-                                                                </tr>
-                                                            <?php endforeach; ?>
-                                                        </tbody>
-                                                    </table>
+                                                                  $runs = isset($entry['run_count']) ? (int) $entry['run_count'] : 0;
+                                                                  $lastStart = isset($entry['last_start']) ? $this->formatTimestamp((string) $entry['last_start']) : __('n/a', 'axs4all-ai');
+                                                                  $lastFinish = isset($entry['last_finish']) ? $this->formatTimestamp((string) $entry['last_finish']) : __('n/a', 'axs4all-ai');
+                                                                  $lastFailure = isset($entry['last_failure']) ? $this->formatTimestamp((string) $entry['last_failure']) : __('n/a', 'axs4all-ai');
+                                                                  $duration = isset($entry['last_duration_ms']) ? $this->formatDurationMs($entry['last_duration_ms']) : __('n/a', 'axs4all-ai');
+                                                                  $failures = isset($entry['failures_consecutive']) ? (int) $entry['failures_consecutive'] : 0;
+                                                                  $meta = isset($entry['meta']) && is_array($entry['meta']) ? $this->formatMetaBadges($entry['meta']) : __('n/a', 'axs4all-ai');
+                                                                  $lastError = isset($entry['last_error']) && $entry['last_error'] !== '' ? $entry['last_error'] : __('n/a', 'axs4all-ai');
+                                                                  $rowClass = $failures > 0 ? 'table-danger' : '';
+                                                                  ?>
+                                                                  <tr class="<?php echo esc_attr($rowClass); ?>">
+                                                                      <th scope="row"><?php echo esc_html((string) $context); ?></th>
+                                                                      <td><span class="badge <?php echo esc_attr($statusClass); ?>"><?php echo esc_html($statusLabel); ?></span></td>
+                                                                      <td><?php echo esc_html(number_format_i18n($runs)); ?></td>
+                                                                      <td><?php echo esc_html($lastStart); ?></td>
+                                                                      <td><?php echo esc_html($lastFinish); ?></td>
+                                                                      <td><?php echo esc_html($lastFailure); ?></td>
+                                                                      <td><?php echo esc_html($duration); ?></td>
+                                                                      <td>
+                                                                          <?php if ($failures > 0) : ?>
+                                                                              <span class="badge badge-danger"><?php echo esc_html(number_format_i18n($failures)); ?></span>
+                                                                          <?php else : ?>
+                                                                              <?php echo esc_html(number_format_i18n($failures)); ?>
+                                                                          <?php endif; ?>
+                                                                      </td>
+                                                                      <td><?php echo esc_html($this->trimErrorMessage($lastError)); ?></td>
+                                                                      <td><?php echo wp_kses_post($meta); ?></td>
+                                                                  </tr>
+                                                              <?php endforeach; ?>
+                                                          </tbody>
+                                                      </table>
                                                 </div>
                                             <?php endif; ?>
                                         </div>
@@ -157,26 +171,48 @@ final class DashboardPage
                                                 <p><?php esc_html_e('No metrics have been recorded yet. They will appear after the next crawl or classification run.', 'axs4all-ai'); ?></p>
                                             <?php else : ?>
                                                 <div class="table-responsive">
-                                                    <table class="table table-sm table-hover axs4all-table-tight">
-                                                        <thead>
-                                                            <tr>
-                                                                <th><?php esc_html_e('Metric', 'axs4all-ai'); ?></th>
-                                                                <th><?php esc_html_e('Updated', 'axs4all-ai'); ?></th>
-                                                                <th><?php esc_html_e('Values', 'axs4all-ai'); ?></th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            <?php foreach ($monitorMetrics as $type => $payload) : ?>
-                                                                <?php
-                                                                $updatedAt = isset($payload['updated_at']) ? $this->formatTimestamp((string) $payload['updated_at']) : __('n/a', 'axs4all-ai');
-                                                                $data = isset($payload['data']) && is_array($payload['data']) ? $this->formatMetaBadges($payload['data']) : __('n/a', 'axs4all-ai');
-                                                                ?>
-                                                                <tr>
-                                                                    <th scope="row"><?php echo esc_html((string) $type); ?></th>
-                                                                    <td><?php echo esc_html($updatedAt); ?></td>
-                                                                    <td><?php echo wp_kses_post($data); ?></td>
-                                                                </tr>
-                                                            <?php endforeach; ?>
+                                                      <table class="table table-sm table-hover axs4all-table-tight">
+                                                          <thead>
+                                                              <tr>
+                                                                  <th><?php esc_html_e('Metric', 'axs4all-ai'); ?></th>
+                                                                  <th><?php esc_html_e('Pending', 'axs4all-ai'); ?></th>
+                                                                  <th><?php esc_html_e('Processed', 'axs4all-ai'); ?></th>
+                                                                  <th><?php esc_html_e('Source', 'axs4all-ai'); ?></th>
+                                                                  <th><?php esc_html_e('Updated', 'axs4all-ai'); ?></th>
+                                                                  <th><?php esc_html_e('Meta', 'axs4all-ai'); ?></th>
+                                                              </tr>
+                                                          </thead>
+                                                          <tbody>
+                                                              <?php foreach ($monitorMetrics as $type => $payload) : ?>
+                                                                  <?php
+                                                                  $updatedAt = isset($payload['updated_at']) ? $this->formatTimestamp((string) $payload['updated_at']) : __('n/a', 'axs4all-ai');
+                                                                  $data = isset($payload['data']) && is_array($payload['data']) ? $payload['data'] : [];
+                                                                  $pending = isset($data['pending']) ? (int) $data['pending'] : null;
+                                                                  $processed = isset($data['processed']) ? (int) $data['processed'] : null;
+                                                                  $source = isset($data['source']) ? (string) $data['source'] : '';
+                                                                  unset($data['pending'], $data['processed'], $data['source']);
+                                                                  $meta = ! empty($data) ? $this->formatMetaBadges($data) : __('n/a', 'axs4all-ai');
+                                                                  $pendingBadge = $pending === null
+                                                                      ? __('n/a', 'axs4all-ai')
+                                                                      : sprintf(
+                                                                          '<span class="badge %1$s">%2$s</span>',
+                                                                          $pending > 0 ? 'badge-warning' : 'badge-success',
+                                                                          esc_html(number_format_i18n($pending))
+                                                                      );
+                                                                  $processedLabel = $processed === null
+                                                                      ? __('n/a', 'axs4all-ai')
+                                                                      : number_format_i18n($processed);
+                                                                  $sourceLabel = $source !== '' ? ucfirst($source) : __('n/a', 'axs4all-ai');
+                                                                  ?>
+                                                                  <tr>
+                                                                      <th scope="row"><?php echo esc_html((string) $type); ?></th>
+                                                                      <td><?php echo wp_kses_post($pendingBadge); ?></td>
+                                                                      <td><?php echo esc_html($processedLabel); ?></td>
+                                                                      <td><?php echo esc_html($sourceLabel); ?></td>
+                                                                      <td><?php echo esc_html($updatedAt); ?></td>
+                                                                      <td><?php echo wp_kses_post($meta); ?></td>
+                                                                  </tr>
+                                                              <?php endforeach; ?>
                                                         </tbody>
                                                     </table>
                                                 </div>
@@ -332,7 +368,7 @@ final class DashboardPage
         if ($timestamp === false || $timestamp === null) {
             return [
                 'primary' => __('Not scheduled', 'axs4all-ai'),
-                'secondary' => __('Schedule the cron hook to resume automatic processing.', 'axs4all-ai'),
+                'secondary' => __('Needs scheduling', 'axs4all-ai'),
             ];
         }
 
@@ -351,6 +387,32 @@ final class DashboardPage
             'primary' => $localTime,
             'secondary' => $relative,
         ];
+    }
+
+    private function isRunStale(string $timestamp): bool
+    {
+        if ($timestamp === '') {
+            return true;
+        }
+
+        $time = strtotime($timestamp . ' UTC');
+        if ($time === false) {
+            return true;
+        }
+
+        $now = current_time('timestamp', true);
+        $threshold = (int) self::STALE_THRESHOLD_MINUTES * 60;
+
+        return ($now - $time) > $threshold;
+    }
+
+    private function describeStaleDiff(string $timestamp): string
+    {
+        if ($timestamp === '') {
+            return __('at an unknown time', 'axs4all-ai');
+        }
+
+        return $this->formatTimestamp($timestamp, true);
     }
 
     /**
@@ -408,7 +470,7 @@ final class DashboardPage
      * @param int|false|null $nextClassification
      * @return array<int, array{title:string,message:string}>
      */
-    private function collectCronWarnings($nextCrawl, $nextClassification): array
+    private function collectCronWarnings($nextCrawl, $nextClassification, string $lastCrawl, string $lastClassification): array
     {
         $warnings = [];
 
@@ -417,12 +479,30 @@ final class DashboardPage
                 'title' => __('Crawler is not scheduled', 'axs4all-ai'),
                 'message' => __('The crawler cron hook has no upcoming run. Check WP-Cron settings or schedule it manually from the Crawl Queue screen.', 'axs4all-ai'),
             ];
+        } elseif ($this->isRunStale($lastCrawl)) {
+            $warnings[] = [
+                'title' => __('Crawler has not finished recently', 'axs4all-ai'),
+                'message' => sprintf(
+                    /* translators: %s: human readable time difference */
+                    __('Last successful crawl finished %s. Ensure the queue is processing and cron is firing.', 'axs4all-ai'),
+                    $this->describeStaleDiff($lastCrawl)
+                ),
+            ];
         }
 
         if ($nextClassification === false || $nextClassification === null) {
             $warnings[] = [
                 'title' => __('Classification runner is not scheduled', 'axs4all-ai'),
                 'message' => __('The classification cron hook is missing a next run. Verify WP-Cron is working or trigger the runner manually to reschedule.', 'axs4all-ai'),
+            ];
+        } elseif ($this->isRunStale($lastClassification)) {
+            $warnings[] = [
+                'title' => __('Classification runner has not finished recently', 'axs4all-ai'),
+                'message' => sprintf(
+                    /* translators: %s: human readable time difference */
+                    __('Last successful classification run finished %s. Verify the runner is not stuck and cron is active.', 'axs4all-ai'),
+                    $this->describeStaleDiff($lastClassification)
+                ),
             ];
         }
 
@@ -544,6 +624,27 @@ final class DashboardPage
         $seconds = $ms / 1000;
 
         return sprintf(__('%s s', 'axs4all-ai'), number_format_i18n($seconds, 2));
+    }
+
+    private function trimErrorMessage(string $message, int $limit = 140): string
+    {
+        $notAvailable = __('n/a', 'axs4all-ai');
+        if ($message === '' || $message === $notAvailable) {
+            return $notAvailable;
+        }
+
+        $clean = trim(\wp_strip_all_tags($message));
+        if ($clean === '') {
+            return $notAvailable;
+        }
+
+        if (function_exists('mb_strlen') ? mb_strlen($clean) : strlen($clean) <= $limit) {
+            return $clean;
+        }
+
+        $slice = function_exists('mb_substr') ? mb_substr($clean, 0, $limit - 1) : substr($clean, 0, $limit - 1);
+
+        return $slice . '…';
     }
 
     private function getDateTimeFormat(): string
