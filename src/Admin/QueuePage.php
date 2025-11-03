@@ -112,6 +112,8 @@ final class QueuePage
                 max-width: 320px;
             }
             .axs4all-queue-layout .card {
+                width: 100%;
+                max-width: none;
                 margin-bottom: 1.5rem;
             }
             .axs4all-queue-card .axs4all-queue-stats {
