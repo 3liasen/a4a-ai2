@@ -7,6 +7,7 @@ namespace Axs4allAi\Admin;
 use Axs4allAi\Data\QueueRepository;
 use Axs4allAi\Classification\ClassificationQueueRepository;
 use Axs4allAi\Infrastructure\Monitor;
+use Axs4allAi\Infrastructure\DebugLogger;
 
 final class DashboardPage
 {
@@ -15,13 +16,16 @@ final class DashboardPage
 
     private QueueRepository $queueRepository;
     private ClassificationQueueRepository $classificationQueueRepository;
+    private DebugLogger $debugLogger;
 
     public function __construct(
         QueueRepository $queueRepository,
-        ClassificationQueueRepository $classificationQueueRepository
+        ClassificationQueueRepository $classificationQueueRepository,
+        DebugLogger $debugLogger
     ) {
         $this->queueRepository = $queueRepository;
         $this->classificationQueueRepository = $classificationQueueRepository;
+        $this->debugLogger = $debugLogger;
     }
 
     public function registerMenu(): void
@@ -59,6 +63,8 @@ final class DashboardPage
         $monitorState = Monitor::getState();
         $jobMonitors = $this->extractMonitorContexts($monitorState);
         $monitorMetrics = $this->extractMonitorMetrics($monitorState['metrics'] ?? []);
+        $activitySummary = $this->buildActivitySummary($jobMonitors, $monitorMetrics);
+        $recentAlertEvents = $this->getRecentAlertEvents();
 
         ?>
         <div class="wrap axs4all-adminlte">
@@ -90,6 +96,85 @@ final class DashboardPage
                             <?php $this->renderSmallBox(__('Pending Classifications', 'axs4all-ai'), (string) number_format_i18n($classificationPending), 'bg-success', 'fa fa-robot'); ?>
                             <?php $this->renderScheduleBox(__('Next Crawl', 'axs4all-ai'), $nextCrawl, 'bg-warning', 'fa fa-clock'); ?>
                             <?php $this->renderScheduleBox(__('Next Classification', 'axs4all-ai'), $nextClassification, 'bg-danger', 'fa fa-stream'); ?>
+                        </div>
+
+                        <div class="row">
+                            <section class="col-lg-7 connectedSortable">
+                                <div class="card card-outline card-success h-100">
+                                    <div class="card-header">
+                                        <h3 class="card-title"><?php esc_html_e("Today's Activity", 'axs4all-ai'); ?></h3>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <?php if (empty($activitySummary)) : ?>
+                                            <div class="p-3">
+                                                <p class="mb-0"><?php esc_html_e('No crawler or classification runs have been recorded yet today.', 'axs4all-ai'); ?></p>
+                                            </div>
+                                        <?php else : ?>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th><?php esc_html_e('Job', 'axs4all-ai'); ?></th>
+                                                            <th><?php esc_html_e('Status', 'axs4all-ai'); ?></th>
+                                                            <th><?php esc_html_e('Processed', 'axs4all-ai'); ?></th>
+                                                            <th><?php esc_html_e('Pending', 'axs4all-ai'); ?></th>
+                                                            <th><?php esc_html_e('Last finish', 'axs4all-ai'); ?></th>
+                                                            <th><?php esc_html_e('Last failure', 'axs4all-ai'); ?></th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <?php foreach ($activitySummary as $row) : ?>
+                                                            <tr>
+                                                                <th scope="row">
+                                                                    <?php echo esc_html($row['label']); ?>
+                                                                    <?php if ($row['link']) : ?>
+                                                                        <a class="btn btn-link btn-sm px-1 py-0" href="<?php echo esc_url($row['link']); ?>">
+                                                                            <?php esc_html_e('View', 'axs4all-ai'); ?>
+                                                                        </a>
+                                                                    <?php endif; ?>
+                                                                </th>
+                                                                <td><span class="badge <?php echo esc_attr($row['status_class']); ?>"><?php echo esc_html($row['status_label']); ?></span></td>
+                                                                <td><?php echo esc_html($row['processed']); ?></td>
+                                                                <td><?php echo wp_kses_post($row['pending']); ?></td>
+                                                                <td><?php echo esc_html($row['last_finish']); ?></td>
+                                                                <td><?php echo esc_html($row['last_failure']); ?></td>
+                                                            </tr>
+                                                        <?php endforeach; ?>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="col-lg-5 connectedSortable">
+                                <div class="card card-outline card-warning h-100">
+                                    <div class="card-header">
+                                        <h3 class="card-title"><?php esc_html_e('Recent Alerts', 'axs4all-ai'); ?></h3>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <?php if (empty($recentAlertEvents)) : ?>
+                                            <div class="p-3">
+                                                <p class="mb-0 text-muted"><?php esc_html_e('No alerts have been dispatched recently. Alert integrations are queued for a later phase.', 'axs4all-ai'); ?></p>
+                                            </div>
+                                        <?php else : ?>
+                                            <div class="list-group list-group-flush">
+                                                <?php foreach ($recentAlertEvents as $event) : ?>
+                                                    <div class="list-group-item d-flex flex-column">
+                                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                                            <span class="badge badge-<?php echo esc_attr($event['severity_class']); ?>"><?php echo esc_html($event['severity']); ?></span>
+                                                            <span class="text-muted small"><?php echo esc_html($event['timestamp']); ?></span>
+                                                        </div>
+                                                        <strong class="mb-1"><?php echo esc_html($event['title']); ?></strong>
+                                                        <span class="text-muted small"><?php echo esc_html($event['message']); ?></span>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </section>
                         </div>
 
                         <?php if (! empty($jobMonitors) || ! empty($monitorMetrics)) : ?>
@@ -563,6 +648,163 @@ final class DashboardPage
     }
 
     /**
+     * @param array<string, array<string, mixed>> $jobMonitors
+     * @param array<string, array<string, mixed>> $monitorMetrics
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildActivitySummary(array $jobMonitors, array $monitorMetrics): array
+    {
+        $contexts = [
+            'crawl' => [
+                'label' => __('Crawler', 'axs4all-ai'),
+                'link' => admin_url('admin.php?page=axs4all-ai-queue'),
+                'metric' => 'crawl_queue',
+            ],
+            'classification' => [
+                'label' => __('Classification Runner', 'axs4all-ai'),
+                'link' => admin_url('admin.php?page=axs4all-ai-classifications'),
+                'metric' => 'classification_queue',
+            ],
+        ];
+
+        $summary = [];
+
+        foreach ($contexts as $key => $config) {
+            if (! isset($jobMonitors[$key])) {
+                continue;
+            }
+
+            $entry = $jobMonitors[$key];
+            $meta = isset($entry['meta']) && is_array($entry['meta']) ? $entry['meta'] : [];
+            $metric = $monitorMetrics[$config['metric']]['data'] ?? [];
+
+            $processed = $this->metaToInt($meta, 'processed');
+            if ($processed === null && isset($metric['processed']) && is_numeric($metric['processed'])) {
+                $processed = (int) $metric['processed'];
+            }
+
+            $pending = $this->metaToInt($meta, 'pending_after');
+            if ($pending === null && isset($metric['pending']) && is_numeric($metric['pending'])) {
+                $pending = (int) $metric['pending'];
+            }
+
+            $summary[] = [
+                'label' => $config['label'],
+                'link' => $config['link'],
+                'status_label' => $this->formatMonitorStatus($entry),
+                'status_class' => $this->monitorStatusClass($entry),
+                'processed' => $processed === null ? __('n/a', 'axs4all-ai') : number_format_i18n($processed),
+                'pending' => $this->formatPendingBadge($pending),
+                'last_finish' => isset($entry['last_finish']) ? $this->formatTimestamp((string) $entry['last_finish']) : __('n/a', 'axs4all-ai'),
+                'last_failure' => isset($entry['last_failure']) ? $this->formatTimestamp((string) $entry['last_failure']) : __('n/a', 'axs4all-ai'),
+            ];
+        }
+
+        return $summary;
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     */
+    private function metaToInt(array $meta, string $key): ?int
+    {
+        if (! array_key_exists($key, $meta)) {
+            return null;
+        }
+
+        $value = $meta[$key];
+        if (is_int($value)) {
+            return $value;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        return null;
+    }
+
+    private function formatPendingBadge(?int $pending): string
+    {
+        if ($pending === null) {
+            return __('n/a', 'axs4all-ai');
+        }
+
+        $class = $pending > 0 ? 'badge-warning' : 'badge-success';
+
+        return sprintf(
+            '<span class="badge %s">%s</span>',
+            esc_attr($class),
+            esc_html(number_format_i18n($pending))
+        );
+    }
+
+    /**
+     * @return array<int, array<string, string>>
+     */
+    private function getRecentAlertEvents(int $limit = 5): array
+    {
+        $events = $this->debugLogger->all(50);
+        if (empty($events)) {
+            return [];
+        }
+
+        $allowed = ['alert', 'alert_error', 'alert_ticket'];
+        $results = [];
+
+        foreach ($events as $event) {
+            if (! isset($event['type']) || ! in_array($event['type'], $allowed, true)) {
+                continue;
+            }
+
+            $context = isset($event['context']) && is_array($event['context']) ? $event['context'] : [];
+            $severity = isset($context['severity']) ? (string) $context['severity'] : ($event['type'] === 'alert_error' ? 'critical' : 'info');
+
+            $results[] = [
+                'title' => ucfirst((string) $event['type']),
+                'message' => isset($event['message']) ? (string) $event['message'] : '',
+                'timestamp' => isset($event['timestamp']) ? $this->formatEventTimestamp((string) $event['timestamp']) : __('n/a', 'axs4all-ai'),
+                'severity' => ucfirst($severity),
+                'severity_class' => $this->severityToBadgeClass($severity),
+            ];
+
+            if (count($results) >= $limit) {
+                break;
+            }
+        }
+
+        return $results;
+    }
+
+    private function severityToBadgeClass(string $severity): string
+    {
+        switch (strtolower($severity)) {
+            case 'critical':
+                return 'badge-danger';
+            case 'warning':
+                return 'badge-warning';
+            case 'info':
+                return 'badge-info';
+            default:
+                return 'badge-secondary';
+        }
+    }
+
+    private function formatEventTimestamp(string $value): string
+    {
+        if ($value === '') {
+            return __('n/a', 'axs4all-ai');
+        }
+
+        $timestamp = strtotime($value);
+        if ($timestamp === false) {
+            return $value;
+        }
+
+        return wp_date($this->getDateTimeFormat(), $timestamp);
+    }
+
+    /**
      * @param array<string, mixed> $entry
      */
     private function formatMonitorStatus(array $entry): string
@@ -642,10 +884,12 @@ final class DashboardPage
             return $clean;
         }
 
-        $slice = function_exists('mb_substr') ? mb_substr($clean, 0, $limit - 1) : substr($clean, 0, $limit - 1);
+        $sliceLength = max(0, $limit - 3);
+        $slice = function_exists('mb_substr') ? mb_substr($clean, 0, $sliceLength) : substr($clean, 0, $sliceLength);
 
-        return $slice . '…';
+        return $slice . '...';
     }
+
 
     private function getDateTimeFormat(): string
     {
@@ -728,3 +972,4 @@ final class DashboardPage
         return implode(' ', $badges);
     }
 }
+

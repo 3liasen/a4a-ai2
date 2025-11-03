@@ -142,7 +142,7 @@ final class Plugin
     private function registerAdminHooks(): void
     {
         $mainSlug = 'axs4all-ai';
-        $dashboard = new DashboardPage($this->queueRepository, $this->classificationQueueRepository);
+        $dashboard = new DashboardPage($this->queueRepository, $this->classificationQueueRepository, $this->debugLogger);
         $settings = new SettingsPage($mainSlug, 'axs4all-ai-settings');
         $queuePage = new QueuePage($this->queueRepository, $this->clientRepository, $this->categoryRepository, $this->snapshotRepository);
         $debugPage = new DebugPage($this->snapshotRepository, $this->debugLogger);
