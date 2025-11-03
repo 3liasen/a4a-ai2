@@ -151,27 +151,16 @@ final class QueuePage
                 padding-right: 1.25rem;
             }
             .axs4all-card-body-tight {
-                padding: 1.25rem;
+                padding: 1.5rem;
             }
             .axs4all-queue-row {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 1.5rem;
                 margin-bottom: 1.5rem;
             }
+            .axs4all-queue-row:last-of-type {
+                margin-bottom: 0;
+            }
             .axs4all-queue-row > section {
-                flex: 1 1 100%;
-                min-width: 320px;
-            }
-            .axs4all-queue-row--split > section {
-                flex: 1 1 320px;
-            }
-            .axs4all-queue-col--wide {
-                flex: 2 1 520px;
-            }
-            .axs4all-queue-col--narrow {
-                flex: 1 1 320px;
-                max-width: 420px;
+                display: block;
             }
             .axs4all-inline-actions {
                 display: inline-flex;
@@ -307,8 +296,8 @@ final class QueuePage
                 </section>
             </div>
 
-            <div class="axs4all-queue-row axs4all-queue-row--split">
-                <section class="axs4all-queue-col axs4all-queue-col--wide">
+            <div class="axs4all-queue-row">
+                <section class="axs4all-queue-col">
                     <div class="card card-outline card-light axs4all-queue-card h-100">
                         <div class="card-header">
                             <h2 class="card-title m-0"><?php esc_html_e('Client URLs', 'axs4all-ai'); ?></h2>
@@ -371,8 +360,10 @@ final class QueuePage
                         </div>
                     </div>
                 </section>
+            </div>
 
-                <section class="axs4all-queue-col axs4all-queue-col--narrow">
+            <div class="axs4all-queue-row">
+                <section class="axs4all-queue-col">
                     <div class="card card-outline card-light axs4all-queue-card h-100">
                         <div class="card-header">
                             <h2 class="card-title m-0"><?php esc_html_e('Add manual URL to Queue', 'axs4all-ai'); ?></h2>
