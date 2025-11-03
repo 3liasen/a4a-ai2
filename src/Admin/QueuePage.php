@@ -306,25 +306,15 @@ final class QueuePage
                                     <input type="hidden" name="queue_url" value="<?php echo esc_attr($row['url']); ?>">
                                     <input type="hidden" name="queue_priority" value="5">
                                     <input type="hidden" name="queue_client_id" value="<?php echo esc_attr((string) $row['client_id']); ?>">
-                                    <?php if (count($row['category_choices']) > 1) : ?>
-                                        <select name="queue_category_payload" style="max-width: 220px;" required>
-                                            <option value="" disabled selected><?php esc_html_e('Select category…', 'axs4all-ai'); ?></option>
-                                            <?php foreach ($row['category_choices'] as $choice) : ?>
-                                                <?php $payload = $choice['id'] . ':' . $choice['slug']; ?>
-                                                <option value="<?php echo esc_attr($payload); ?>"><?php echo esc_html($choice['name']); ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
+                                    <?php
+                                    $firstChoice = $row['category_choices'][0] ?? null;
+                                    if ($firstChoice !== null) :
+                                        $payload = $firstChoice['id'] . ':' . $firstChoice['slug'];
+                                    ?>
+                                        <input type="hidden" name="queue_category_payload" value="<?php echo esc_attr($payload); ?>">
+                                        <span class="axs4all-queue-category-display"><?php echo esc_html($firstChoice['name']); ?></span>
                                     <?php else : ?>
-                                        <?php
-                                        $firstChoice = $row['category_choices'][0] ?? null;
-                                        if ($firstChoice !== null) :
-                                            $payload = $firstChoice['id'] . ':' . $firstChoice['slug'];
-                                        ?>
-                                            <input type="hidden" name="queue_category_payload" value="<?php echo esc_attr($payload); ?>">
-                                            <span class="axs4all-queue-category-display"><?php echo esc_html($firstChoice['name']); ?></span>
-                                        <?php else : ?>
-                                            <span class="axs4all-queue-category-display"><?php esc_html_e('No categories selected', 'axs4all-ai'); ?></span>
-                                        <?php endif; ?>
+                                        <span class="axs4all-queue-category-display"><?php esc_html_e('No categories selected', 'axs4all-ai'); ?></span>
                                     <?php endif; ?>
                                     <?php if (! empty($row['crawl_subpages'])) : ?>
                                         <input type="hidden" name="queue_crawl_subpages" value="1">
