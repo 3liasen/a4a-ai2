@@ -163,6 +163,16 @@ final class QueuePage
                 flex: 1 1 100%;
                 min-width: 320px;
             }
+            .axs4all-queue-row--split > section {
+                flex: 1 1 320px;
+            }
+            .axs4all-queue-col--wide {
+                flex: 2 1 520px;
+            }
+            .axs4all-queue-col--narrow {
+                flex: 1 1 320px;
+                max-width: 420px;
+            }
             .axs4all-inline-actions {
                 display: inline-flex;
                 align-items: center;
@@ -297,8 +307,8 @@ final class QueuePage
                 </section>
             </div>
 
-            <div class="axs4all-queue-row">
-                <section class="axs4all-queue-col">
+            <div class="axs4all-queue-row axs4all-queue-row--split">
+                <section class="axs4all-queue-col axs4all-queue-col--wide">
                     <div class="card card-outline card-light axs4all-queue-card h-100">
                         <div class="card-header">
                             <h2 class="card-title m-0"><?php esc_html_e('Client URLs', 'axs4all-ai'); ?></h2>
@@ -307,196 +317,123 @@ final class QueuePage
                             <p class="mb-3"><?php esc_html_e('Use the shortcuts below to queue URLs that belong to configured clients.', 'axs4all-ai'); ?></p>
                             <div class="axs4all-table-responsive">
                                 <table class="widefat striped">
-                <thead>
-                    <tr>
-                        <th><?php esc_html_e('URL', 'axs4all-ai'); ?></th>
-                        <th><?php esc_html_e('Client', 'axs4all-ai'); ?></th>
-                        <th><?php esc_html_e('Category', 'axs4all-ai'); ?></th>
-                        <th><?php esc_html_e('Subpages', 'axs4all-ai'); ?></th>
-                        <th><?php esc_html_e('Status', 'axs4all-ai'); ?></th>
-                        <th><?php esc_html_e('Priority', 'axs4all-ai'); ?></th>
-                        <th><?php esc_html_e('Created', 'axs4all-ai'); ?></th>
-                        <th><?php esc_html_e('Updated', 'axs4all-ai'); ?></th>
-                        <th><?php esc_html_e('Latest Snapshot', 'axs4all-ai'); ?></th>
-                        <th><?php esc_html_e('Actions', 'axs4all-ai'); ?></th>
-                    </tr>
-                </thead>
-                <tbody>
-                <?php if (empty($recent)) : ?>
-                    <tr>
-                        <td colspan="10"><?php esc_html_e('No queue items yet.', 'axs4all-ai'); ?></td>
-                    </tr>
-                <?php else : ?>
-                    <?php foreach ($recent as $item) : ?>
-                        <tr>
-                            <td><a href="<?php echo esc_url($item['source_url']); ?>" target="_blank" rel="noreferrer noopener"><?php echo esc_html($item['source_url']); ?></a></td>
-                            <td><?php echo esc_html($clientOptions[$item['client_id']] ?? 'N/A'); ?></td>
-                            <td><?php echo esc_html($this->formatCategoryLabel($item, $categoryOptions)); ?></td>
-                            <td><?php echo ! empty($item['crawl_subpages']) ? esc_html__('Yes', 'axs4all-ai') : esc_html__('No', 'axs4all-ai'); ?></td>
-                            <td><?php echo $this->renderStatusCell($item); ?></td>
-                            <td><?php echo esc_html((string) $item['priority']); ?></td>
-                            <td><?php echo esc_html($this->formatSimpleDate($item['created_at'] ?? null)); ?></td>
-                            <td><?php echo esc_html($this->formatSimpleDate($item['updated_at'] ?? null)); ?></td>
-                        <td>
-                            <?php
-                            $snapshot = $snapshotMap[$item['id']] ?? null;
-                            if ($snapshot === null) {
-                                    echo '&mdash;';
-                                } else {
-                                    $snapshotUrl = add_query_arg(
-                                        [
-                                            'page' => 'axs4all-ai-debug',
-                                            'snapshot_id' => (int) $snapshot['id'],
-                                        ],
-                                        admin_url('admin.php')
-                                    );
-                                    printf(
-                                        '<a href="%s">%s</a>',
-                                        esc_url($snapshotUrl),
-                                        esc_html((string) $snapshot['fetched_at'])
-                                    );
-                                }
-                                ?>
-                        </td>
-                        <td>
-                                <?php if ($item['status'] === 'failed') : ?>
-                                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline;">
-                                        <?php wp_nonce_field('axs4all_ai_requeue_queue_' . (int) $item['id']); ?>
-                                        <input type="hidden" name="action" value="axs4all_ai_requeue_queue">
-                                        <input type="hidden" name="queue_id" value="<?php echo esc_attr((string) $item['id']); ?>">
-                                        <button type="submit" class="button button-secondary"><?php esc_html_e('Requeue', 'axs4all-ai'); ?></button>
-                                    </form>
-                                <?php endif; ?>
-                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('<?php echo esc_js(__('Remove this queue item?', 'axs4all-ai')); ?>');" style="display:inline;">
-                                    <?php wp_nonce_field('axs4all_ai_delete_queue_' . (int) $item['id']); ?>
-                                    <input type="hidden" name="action" value="axs4all_ai_delete_queue">
-                                    <input type="hidden" name="queue_id" value="<?php echo esc_attr((string) $item['id']); ?>">
-                                    <button type="submit" class="button button-link-delete"><?php esc_html_e('Delete', 'axs4all-ai'); ?></button>
-                                </form>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-                <?php endif; ?>
-                </tbody>
-            </table>
-                </div>
+                                    <thead>
+                                        <tr>
+                                            <th><?php esc_html_e('Client', 'axs4all-ai'); ?></th>
+                                            <th><?php esc_html_e('URL', 'axs4all-ai'); ?></th>
+                                            <th><?php esc_html_e('Categories', 'axs4all-ai'); ?></th>
+                                            <th><?php esc_html_e('Queue', 'axs4all-ai'); ?></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    <?php if (empty($clientUrls)) : ?>
+                                        <tr>
+                                            <td colspan="4"><?php esc_html_e('No client URLs found.', 'axs4all-ai'); ?></td>
+                                        </tr>
+                                    <?php else : ?>
+                                        <?php foreach ($clientUrls as $row) : ?>
+                                            <tr>
+                                                <td><?php echo esc_html($row['client']); ?></td>
+                                                <td><a href="<?php echo esc_url($row['url']); ?>" target="_blank" rel="noreferrer noopener"><?php echo esc_html($row['url']); ?></a></td>
+                                                <td>
+                                                    <?php if (empty($row['categories'])) : ?>
+                                                        <em><?php esc_html_e('No categories selected', 'axs4all-ai'); ?></em>
+                                                    <?php else : ?>
+                                                        <?php echo esc_html(implode(', ', $row['categories'])); ?>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td>
+                                                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="axs4all-inline-actions">
+                                                        <?php wp_nonce_field('axs4all_ai_add_queue'); ?>
+                                                        <input type="hidden" name="action" value="axs4all_ai_add_queue">
+                                                        <input type="hidden" name="queue_url" value="<?php echo esc_attr($row['url']); ?>">
+                                                        <input type="hidden" name="queue_priority" value="5">
+                                                        <input type="hidden" name="queue_client_id" value="<?php echo esc_attr((string) $row['client_id']); ?>">
+                                                        <?php
+                                                        $firstChoice = $row['category_choices'][0] ?? null;
+                                                        if ($firstChoice !== null) :
+                                                            $payload = $firstChoice['id'] . ':' . $firstChoice['slug'];
+                                                        ?>
+                                                            <input type="hidden" name="queue_category_payload" value="<?php echo esc_attr($payload); ?>">
+                                                        <?php endif; ?>
+                                                        <?php if (! empty($row['crawl_subpages'])) : ?>
+                                                            <input type="hidden" name="queue_crawl_subpages" value="1">
+                                                        <?php endif; ?>
+                                                        <button type="submit" class="button button-primary button-small"><?php esc_html_e('Queue URL', 'axs4all-ai'); ?></button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="axs4all-queue-col axs4all-queue-col--narrow">
+                    <div class="card card-outline card-light axs4all-queue-card h-100">
+                        <div class="card-header">
+                            <h2 class="card-title m-0"><?php esc_html_e('Add manual URL to Queue', 'axs4all-ai'); ?></h2>
+                        </div>
+                        <div class="card-body axs4all-card-body-tight">
+                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="axs4all-manual-form">
+                                <?php wp_nonce_field('axs4all_ai_add_queue'); ?>
+                                <input type="hidden" name="action" value="axs4all_ai_add_queue" />
+                                <div class="form-group">
+                                    <label for="axs4all-ai-queue-url"><?php esc_html_e('URL', 'axs4all-ai'); ?></label>
+                                    <input type="url" class="form-control" name="queue_url" id="axs4all-ai-queue-url" required placeholder="https://example.com">
+                                </div>
+                                <div class="form-group">
+                                    <label for="axs4all-ai-queue-client"><?php esc_html_e('Client', 'axs4all-ai'); ?></label>
+                                    <select name="queue_client_id" id="axs4all-ai-queue-client" class="form-control">
+                                        <option value="0"><?php esc_html_e('None (manual URL)', 'axs4all-ai'); ?></option>
+                                        <?php foreach ($clientOptions as $clientId => $clientName) : ?>
+                                            <option value="<?php echo esc_attr((string) $clientId); ?>"><?php echo esc_html($clientName); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <span class="form-text"><?php esc_html_e('Associate the queue item with a configured client so downstream jobs know which URLs belong together.', 'axs4all-ai'); ?></span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="axs4all-ai-queue-category"><?php esc_html_e('Category', 'axs4all-ai'); ?></label>
+                                    <select name="queue_category_payload" id="axs4all-ai-queue-category" class="form-control">
+                                        <option value="0"><?php esc_html_e('Use manual slug / default', 'axs4all-ai'); ?></option>
+                                        <?php foreach ($categoryOptions as $categoryId => $categoryMeta) : ?>
+                                            <?php
+                                            $slug = $categoryMeta['value'];
+                                            $label = sprintf('%s (%s)', $categoryMeta['name'], $slug);
+                                            ?>
+                                            <option value="<?php echo esc_attr($categoryId . ':' . $slug); ?>"><?php echo esc_html($label); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <span class="form-text"><?php esc_html_e('Choose a category to attach to the crawl item. Leave on manual to fall back to the slug field or the default prompts.', 'axs4all-ai'); ?></span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="axs4all-ai-queue-category-slug"><?php esc_html_e('Manual category slug (optional)', 'axs4all-ai'); ?></label>
+                                    <input type="text" class="form-control" name="queue_category" id="axs4all-ai-queue-category-slug" placeholder="<?php esc_attr_e('restaurant', 'axs4all-ai'); ?>">
+                                    <span class="form-text"><?php esc_html_e('Use this if you need a category that is not yet configured above. Leave empty to fall back to "default".', 'axs4all-ai'); ?></span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="axs4all-ai-queue-priority"><?php esc_html_e('Priority', 'axs4all-ai'); ?></label>
+                                    <input type="number" min="1" max="9" step="1" class="form-control" name="queue_priority" id="axs4all-ai-queue-priority" value="5">
+                                    <span class="form-text"><?php esc_html_e('Lower numbers run earlier.', 'axs4all-ai'); ?></span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="axs4all-ai-queue-subpages">
+                                        <input type="checkbox" name="queue_crawl_subpages" id="axs4all-ai-queue-subpages" value="1">
+                                        <?php esc_html_e('Crawl visible subpages after this URL', 'axs4all-ai'); ?>
+                                    </label>
+                                    <span class="form-text"><?php esc_html_e('When enabled, the crawler will attempt to follow visible navigation links (depth-limited) and queue those pages too.', 'axs4all-ai'); ?></span>
+                                </div>
+                                <div class="axs4all-inline-form" style="justify-content:flex-end;">
+                                    <button type="submit" class="button button-primary"><?php esc_html_e('Queue URL', 'axs4all-ai'); ?></button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </section>
             </div>
-
-            <div class="card card-outline card-light axs4all-queue-card">
-                <div class="card-header">
-                    <h2 class="card-title" style="margin:0;"><?php esc_html_e('Client URLs', 'axs4all-ai'); ?></h2>
-                </div>
-                <div class="card-body axs4all-card-table">
-                    <p><?php esc_html_e('Use the shortcuts below to queue URLs that belong to configured clients.', 'axs4all-ai'); ?></p>
-                    <table class="widefat striped">
-                <thead>
-                    <tr>
-                        <th><?php esc_html_e('Client', 'axs4all-ai'); ?></th>
-                        <th><?php esc_html_e('URL', 'axs4all-ai'); ?></th>
-                        <th><?php esc_html_e('Categories', 'axs4all-ai'); ?></th>
-                        <th><?php esc_html_e('Queue', 'axs4all-ai'); ?></th>
-                    </tr>
-                </thead>
-                <tbody>
-                <?php if (empty($clientUrls)) : ?>
-                    <tr>
-                        <td colspan="4"><?php esc_html_e('No client URLs found.', 'axs4all-ai'); ?></td>
-                    </tr>
-                <?php else : ?>
-                    <?php foreach ($clientUrls as $row) : ?>
-                        <tr>
-                            <td><?php echo esc_html($row['client']); ?></td>
-                            <td><a href="<?php echo esc_url($row['url']); ?>" target="_blank" rel="noreferrer noopener"><?php echo esc_html($row['url']); ?></a></td>
-                            <td>
-                                <?php if (empty($row['categories'])) : ?>
-                                    <em><?php esc_html_e('No categories selected', 'axs4all-ai'); ?></em>
-                                <?php else : ?>
-                                    <?php echo esc_html(implode(', ', $row['categories'])); ?>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="axs4all-inline-actions">
-                                    <?php wp_nonce_field('axs4all_ai_add_queue'); ?>
-                                    <input type="hidden" name="action" value="axs4all_ai_add_queue">
-                                    <input type="hidden" name="queue_url" value="<?php echo esc_attr($row['url']); ?>">
-                                    <input type="hidden" name="queue_priority" value="5">
-                                    <input type="hidden" name="queue_client_id" value="<?php echo esc_attr((string) $row['client_id']); ?>">
-                                    <?php
-                                    $firstChoice = $row['category_choices'][0] ?? null;
-                                    if ($firstChoice !== null) :
-                                        $payload = $firstChoice['id'] . ':' . $firstChoice['slug'];
-                                    ?>
-                                        <input type="hidden" name="queue_category_payload" value="<?php echo esc_attr($payload); ?>">
-                                    <?php endif; ?>
-                                    <?php if (! empty($row['crawl_subpages'])) : ?>
-                                        <input type="hidden" name="queue_crawl_subpages" value="1">
-                                    <?php endif; ?>
-                                    <button type="submit" class="button button-primary button-small"><?php esc_html_e('Queue URL', 'axs4all-ai'); ?></button>
-                                </form>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-
-        <div class="axs4all-queue-row">
-            <section class="axs4all-queue-col">
-                <div class="card card-outline card-light axs4all-queue-card h-100">
-                    <div class="card-header">
-                        <h2 class="card-title m-0"><?php esc_html_e('Add manual URL to Queue', 'axs4all-ai'); ?></h2>
-                    </div>
-                    <div class="card-body axs4all-card-body-tight">
-                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="axs4all-manual-form">
-                            <?php wp_nonce_field('axs4all_ai_add_queue'); ?>
-                            <input type="hidden" name="action" value="axs4all_ai_add_queue" />
-                            <div class="form-group">
-                                <label for="axs4all-ai-queue-url"><?php esc_html_e('URL', 'axs4all-ai'); ?></label>
-                                <input type="url" class="form-control" name="queue_url" id="axs4all-ai-queue-url" required placeholder="https://example.com">
-                            </div>
-                            <div class="form-group">
-                                <label for="axs4all-ai-queue-client"><?php esc_html_e('Client', 'axs4all-ai'); ?></label>
-                                <select name="queue_client_id" id="axs4all-ai-queue-client" class="form-control">
-                                    <option value="0"><?php esc_html_e('None (manual URL)', 'axs4all-ai'); ?></option>
-                                    <?php foreach ($clientOptions as $clientId => $clientName) : ?>
-                                        <option value="<?php echo esc_attr((string) $clientId); ?>"><?php echo esc_html($clientName); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <span class="form-text"><?php esc_html_e('Associate the queue item with a configured client so downstream jobs know which URLs belong together.', 'axs4all-ai'); ?></span>
-                            </div>
-                            <div class="form-group">
-                                <label for="axs4all-ai-queue-category"><?php esc_html_e('Category', 'axs4all-ai'); ?></label>
-                                <select name="queue_category_payload" id="axs4all-ai-queue-category" class="form-control">
-                                    <option value="0"><?php esc_html_e('Use manual slug / default', 'axs4all-ai'); ?></option>
-                                    <?php foreach ($categoryOptions as $categoryId => $categoryMeta) : ?>
-                                        <?php
-                                        $slug = $categoryMeta['value'];
-                                        $label = sprintf('%s (%s)', $categoryMeta['name'], $slug);
-                                        ?>
-                                        <option value="<?php echo esc_attr($categoryId . ':' . $slug); ?>"><?php echo esc_html($label); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <span class="form-text"><?php esc_html_e('Choose a category to attach to the crawl item. Leave on manual to fall back to the slug field or the default prompts.', 'axs4all-ai'); ?></span>
-                            </div>
-                            <div class="form-group">
-                                <label for="axs4all-ai-queue-category-slug"><?php esc_html_e('Manual category slug (optional)', 'axs4all-ai'); ?></label>
-                                <input type="text" class="form-control" name="queue_category" id="axs4all-ai-queue-category-slug" placeholder="<?php esc_attr_e('restaurant', 'axs4all-ai'); ?>">
-                                <span class="form-text"><?php esc_html_e('Use this if you need a category that is not yet configured above. Leave empty to fall back to "default".', 'axs4all-ai'); ?></span>
-                            </div>
-                            <div class="form-group">
-                                <label for="axs4all-ai-queue-priority"><?php esc_html_e('Priority', 'axs4all-ai'); ?></label>
-                                <input type="number" min="1" max="9" step="1" class="form-control" name="queue_priority" id="axs4all-ai-queue-priority" value="5">
-                                <span class="form-text"><?php esc_html_e('Lower numbers run earlier.', 'axs4all-ai'); ?></span>
-                            </div>
-                            <div class="axs4all-inline-form" style="justify-content:flex-end;">
-                                <button type="submit" class="button button-primary"><?php esc_html_e('Queue URL', 'axs4all-ai'); ?></button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </section>
-        </div>
         <?php
     }
 
