@@ -77,6 +77,24 @@ final class QueuePage
                 color: #fff;
                 line-height: 1.4;
             }
+            .axs4all-manual-form .form-group {
+                margin-bottom: 1rem;
+            }
+            .axs4all-manual-form .form-group label {
+                font-weight: 600;
+                display: block;
+                margin-bottom: 0.35rem;
+            }
+            .axs4all-manual-form .form-control {
+                width: 100%;
+                max-width: 100%;
+            }
+            .axs4all-manual-form .form-text {
+                display: block;
+                margin-top: 0.25rem;
+                font-size: 12px;
+                color: #6b7280;
+            }
             .axs4all-status-pending { background: #21759b; }
             .axs4all-status-processing { background: #6f42c1; }
             .axs4all-status-completed { background: #2f855a; }
@@ -134,7 +152,14 @@ final class QueuePage
                 padding: 1.25rem;
             }
             .axs4all-queue-row {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 1.5rem;
                 margin-bottom: 1.5rem;
+            }
+            .axs4all-queue-row > section {
+                flex: 1 1 100%;
+                min-width: 320px;
             }
             .axs4all-inline-actions {
                 display: inline-flex;
@@ -176,7 +201,7 @@ final class QueuePage
                             <form class="axs4all-inline-form" method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                                 <?php wp_nonce_field('axs4all_ai_run_crawl'); ?>
                                 <input type="hidden" name="action" value="axs4all_ai_run_crawl_now" />
-                                <button type="submit" class="btn btn-primary btn-block"><?php esc_html_e('Run Crawl Now', 'axs4all-ai'); ?></button>
+                                <button type="submit" class="button button-primary"><?php esc_html_e('Run Crawl Now', 'axs4all-ai'); ?></button>
                             </form>
                         </div>
                     </div>
@@ -190,8 +215,8 @@ final class QueuePage
                             <h2 class="card-title m-0"><?php esc_html_e('Recent Queue Items', 'axs4all-ai'); ?></h2>
                         </div>
                         <div class="card-body axs4all-card-table">
-                            <div class="table-responsive">
-                                <table class="table table-striped table-hover">
+                            <div class="axs4all-table-responsive">
+                                <table class="widefat striped">
                                     <thead>
                                         <tr>
                                             <th><?php esc_html_e('URL', 'axs4all-ai'); ?></th>
@@ -249,14 +274,14 @@ final class QueuePage
                                                             <?php wp_nonce_field('axs4all_ai_requeue_queue_' . (int) $item['id']); ?>
                                                             <input type="hidden" name="action" value="axs4all_ai_requeue_queue">
                                                             <input type="hidden" name="queue_id" value="<?php echo esc_attr((string) $item['id']); ?>">
-                                    <button type="submit" class="btn btn-outline-secondary btn-sm"><?php esc_html_e('Requeue', 'axs4all-ai'); ?></button>
+                                    <button type="submit" class="button button-secondary button-small"><?php esc_html_e('Requeue', 'axs4all-ai'); ?></button>
                                                         </form>
                                                     <?php endif; ?>
                                                     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" onsubmit="return confirm('<?php echo esc_js(__('Remove this queue item?', 'axs4all-ai')); ?>');" style="display:inline;">
                                                         <?php wp_nonce_field('axs4all_ai_delete_queue_' . (int) $item['id']); ?>
                                                         <input type="hidden" name="action" value="axs4all_ai_delete_queue">
                                                         <input type="hidden" name="queue_id" value="<?php echo esc_attr((string) $item['id']); ?>">
-                                                        <button type="submit" class="btn btn-link text-danger btn-sm"><?php esc_html_e('Delete', 'axs4all-ai'); ?></button>
+                                                        <button type="submit" class="button button-link-delete button-small"><?php esc_html_e('Delete', 'axs4all-ai'); ?></button>
                                                     </form>
                                                 </td>
                                             </tr>
@@ -278,8 +303,8 @@ final class QueuePage
                         </div>
                         <div class="card-body axs4all-card-table">
                             <p class="mb-3"><?php esc_html_e('Use the shortcuts below to queue URLs that belong to configured clients.', 'axs4all-ai'); ?></p>
-                            <div class="table-responsive">
-                                <table class="table table-striped table-hover">
+                            <div class="axs4all-table-responsive">
+                                <table class="widefat striped">
                 <thead>
                     <tr>
                         <th><?php esc_html_e('URL', 'axs4all-ai'); ?></th>
@@ -404,7 +429,7 @@ final class QueuePage
                                     <?php if (! empty($row['crawl_subpages'])) : ?>
                                         <input type="hidden" name="queue_crawl_subpages" value="1">
                                     <?php endif; ?>
-                                    <button type="submit" class="btn btn-primary btn-sm"><?php esc_html_e('Queue URL', 'axs4all-ai'); ?></button>
+                                    <button type="submit" class="button button-primary button-small"><?php esc_html_e('Queue URL', 'axs4all-ai'); ?></button>
                                 </form>
                             </td>
                         </tr>
@@ -436,7 +461,7 @@ final class QueuePage
                                         <option value="<?php echo esc_attr((string) $clientId); ?>"><?php echo esc_html($clientName); ?></option>
                                     <?php endforeach; ?>
                                 </select>
-                                <small class="form-text text-muted"><?php esc_html_e('Associate the queue item with a configured client so downstream jobs know which URLs belong together.', 'axs4all-ai'); ?></small>
+                                <span class="form-text"><?php esc_html_e('Associate the queue item with a configured client so downstream jobs know which URLs belong together.', 'axs4all-ai'); ?></span>
                             </div>
                             <div class="form-group">
                                 <label for="axs4all-ai-queue-category"><?php esc_html_e('Category', 'axs4all-ai'); ?></label>
@@ -450,20 +475,20 @@ final class QueuePage
                                         <option value="<?php echo esc_attr($categoryId . ':' . $slug); ?>"><?php echo esc_html($label); ?></option>
                                     <?php endforeach; ?>
                                 </select>
-                                <small class="form-text text-muted"><?php esc_html_e('Choose a category to attach to the crawl item. Leave on manual to fall back to the slug field or the default prompts.', 'axs4all-ai'); ?></small>
+                                <span class="form-text"><?php esc_html_e('Choose a category to attach to the crawl item. Leave on manual to fall back to the slug field or the default prompts.', 'axs4all-ai'); ?></span>
                             </div>
                             <div class="form-group">
                                 <label for="axs4all-ai-queue-category-slug"><?php esc_html_e('Manual category slug (optional)', 'axs4all-ai'); ?></label>
                                 <input type="text" class="form-control" name="queue_category" id="axs4all-ai-queue-category-slug" placeholder="<?php esc_attr_e('restaurant', 'axs4all-ai'); ?>">
-                                <small class="form-text text-muted"><?php esc_html_e('Use this if you need a category that is not yet configured above. Leave empty to fall back to "default".', 'axs4all-ai'); ?></small>
+                                <span class="form-text"><?php esc_html_e('Use this if you need a category that is not yet configured above. Leave empty to fall back to "default".', 'axs4all-ai'); ?></span>
                             </div>
                             <div class="form-group">
                                 <label for="axs4all-ai-queue-priority"><?php esc_html_e('Priority', 'axs4all-ai'); ?></label>
                                 <input type="number" min="1" max="9" step="1" class="form-control" name="queue_priority" id="axs4all-ai-queue-priority" value="5">
-                                <small class="form-text text-muted"><?php esc_html_e('Lower numbers run earlier.', 'axs4all-ai'); ?></small>
+                                <span class="form-text"><?php esc_html_e('Lower numbers run earlier.', 'axs4all-ai'); ?></span>
                             </div>
-                            <div class="d-flex justify-content-end">
-                                <button type="submit" class="btn btn-primary"><?php esc_html_e('Queue URL', 'axs4all-ai'); ?></button>
+                            <div class="axs4all-inline-form" style="justify-content:flex-end;">
+                                <button type="submit" class="button button-primary"><?php esc_html_e('Queue URL', 'axs4all-ai'); ?></button>
                             </div>
                         </form>
                     </div>
@@ -953,6 +978,8 @@ final class QueuePage
         return $slug !== '' ? $slug : 'default';
     }
 }
+
+
 
 
 
