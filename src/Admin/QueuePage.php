@@ -93,6 +93,17 @@ final class QueuePage
                 color: #c53030;
                 max-width: 320px;
             }
+            .axs4all-queue-category-display {
+                display: inline-flex;
+                align-items: center;
+                min-height: 32px;
+                padding: 0 10px;
+                border: 1px solid #ccd0d4;
+                border-radius: 4px;
+                background-color: #f8f9fa;
+                margin-right: 8px;
+                font-weight: 500;
+            }
         </style>
         <div class="wrap">
             <h1><?php esc_html_e('Crawl Queue', 'axs4all-ai'); ?></h1>
@@ -310,9 +321,9 @@ final class QueuePage
                                             $payload = $firstChoice['id'] . ':' . $firstChoice['slug'];
                                         ?>
                                             <input type="hidden" name="queue_category_payload" value="<?php echo esc_attr($payload); ?>">
-                                            <span><?php echo esc_html($firstChoice['name']); ?></span>
+                                            <span class="axs4all-queue-category-display"><?php echo esc_html($firstChoice['name']); ?></span>
                                         <?php else : ?>
-                                            <span><?php esc_html_e('No categories selected', 'axs4all-ai'); ?></span>
+                                            <span class="axs4all-queue-category-display"><?php esc_html_e('No categories selected', 'axs4all-ai'); ?></span>
                                         <?php endif; ?>
                                     <?php endif; ?>
                                     <?php if (! empty($row['crawl_subpages'])) : ?>
