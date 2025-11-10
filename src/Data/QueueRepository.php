@@ -152,7 +152,49 @@ final class QueueRepository
 
         return $rows;
     }
+    public function search(array $filters = [], int $limit = 50): array
+    {
+        $limit = max(1, $limit);
+        $where = [];
+        $params = [];
 
+        if (! empty($filters['status']) && is_string($filters['status'])) {
+            $where[] = 'status = %s';
+            $params[] = sanitize_key($filters['status']);
+        }
+
+        if (array_key_exists('client_id', $filters)) {
+            $clientId = (int) $filters['client_id'];
+            if ($clientId > 0) {
+                $where[] = 'client_id = %d';
+                $params[] = $clientId;
+            } elseif ($clientId === 0) {
+                $where[] = '(client_id IS NULL OR client_id = 0)';
+            }
+        }
+
+        if (! empty($filters['search']) && is_string($filters['search'])) {
+            $like = '%' . $this->wpdb->esc_like($filters['search']) . '%';
+            $where[] = 'source_url LIKE %s';
+            $params[] = $like;
+        }
+
+        $sql = "SELECT id, source_url, category, client_id, category_id, status, priority, attempts, crawl_subpages, created_at, updated_at, last_attempted_at, last_error\n                FROM {$this->table}";
+
+        if (! empty($where)) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+
+        $sql .= ' ORDER BY created_at DESC LIMIT %d';
+        $params[] = $limit;
+
+        $prepared = $this->wpdb->prepare($sql, $params);
+
+        /** @var array<int, array<string, mixed>> $rows */
+        $rows = $this->wpdb->get_results($prepared, ARRAY_A) ?: [];
+
+        return $rows;
+    }\n
     public function countPending(): int
     {
         $sql = $this->wpdb->prepare(
@@ -305,3 +347,9 @@ final class QueueRepository
         return $normalized;
     }
 }
+
+
+
+
+
+
