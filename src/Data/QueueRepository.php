@@ -134,6 +134,9 @@ final class QueueRepository
     /**
      * @return array<int, array<string, mixed>>
      */
+    /**
+     * @return array<int, array<string, mixed>>
+     */
     public function getPending(int $limit = 5): array
     {
         $limit = max(1, $limit);
@@ -152,6 +155,11 @@ final class QueueRepository
 
         return $rows;
     }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<int, array<string, mixed>>
+     */
     public function search(array $filters = [], int $limit = 50): array
     {
         $limit = max(1, $limit);
@@ -179,7 +187,8 @@ final class QueueRepository
             $params[] = $like;
         }
 
-        $sql = "SELECT id, source_url, category, client_id, category_id, status, priority, attempts, crawl_subpages, created_at, updated_at, last_attempted_at, last_error\n                FROM {$this->table}";
+        $sql = "SELECT id, source_url, category, client_id, category_id, status, priority, attempts, crawl_subpages, created_at, updated_at, last_attempted_at, last_error
+                FROM {$this->table}";
 
         if (! empty($where)) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
@@ -188,14 +197,18 @@ final class QueueRepository
         $sql .= ' ORDER BY created_at DESC LIMIT %d';
         $params[] = $limit;
 
-        $prepared = $this->wpdb->prepare($sql, $params);
+        $query = $this->wpdb->prepare($sql, $params);
 
         /** @var array<int, array<string, mixed>> $rows */
-        $rows = $this->wpdb->get_results($prepared, ARRAY_A) ?: [];
+        $rows = $this->wpdb->get_results($query, ARRAY_A) ?: [];
 
         return $rows;
-    }\n
-    public function countPending(): int
+    }
+
+    /**
+     * @return int
+     */
+    public function countPending(): int(): int
     {
         $sql = $this->wpdb->prepare(
             "SELECT COUNT(id) FROM {$this->table} WHERE status = %s",
@@ -347,6 +360,7 @@ final class QueueRepository
         return $normalized;
     }
 }
+
 
 
 

@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"php.validate.enable": true,
+		"window.autoDetectColorScheme": true,
+		"git.confirmSync": false,
+		"git.ignoredRepositories": [
+			"G:\\"
+		]
+	}
+}
