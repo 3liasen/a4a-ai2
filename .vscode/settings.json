@@ -1,11 +1,11 @@
 {
-  "phpunit.args": [
-    "--bootstrap",
-    "${workspaceFolder}/tests/bootstrap.php"
-  ],
+  "phpunit.args": ["--bootstrap","${workspaceFolder}/tests/bootstrap.php"],
   "php.validate.enable": true,
   "php.validate.executablePath": "c:/php/php.exe",
   "window.autoDetectColorScheme": true,
+
+  "terminal.integrated.cwd": "${workspaceFolder}",
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
 
   "git.enableSmartCommit": true,
   "git.postCommitCommand": "push",
@@ -13,5 +13,6 @@
   "git.autofetch": true,
   "git.defaultCloneDirectory": "C:\\gits",
   "git.ignoredRepositories": ["G:\\"],
-  "window.restoreWindows": "none"
+  "window.restoreWindows": "none",
+  "files.exclude": { "**/dist": true, "**/node_modules": true }
 }

@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "preflight: enforce CWD",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile","-Command",
+        "$rt = git rev-parse --show-toplevel; if(-not $rt){ throw 'No git root' }; if($rt -ne (Resolve-Path .).Path){ throw \"Bad CWD: $pwd -> $rt\" }"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}
