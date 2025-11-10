@@ -5,5 +5,10 @@
   ],
   "php.validate.enable": true,
   "php.validate.executablePath": "c:/php/php.exe",
-  "window.autoDetectColorScheme": true
+  "window.autoDetectColorScheme": true,
+
+  "git.enableSmartCommit": true,
+  "git.postCommitCommand": "push",
+  "git.confirmSync": false,
+  "git.autofetch": true
 }
