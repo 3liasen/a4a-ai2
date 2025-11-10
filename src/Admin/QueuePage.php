@@ -57,7 +57,7 @@ final class QueuePage
         }
 
         $message = isset($_GET['message']) ? sanitize_text_field((string) $_GET['message']) : null;
-        $recent = $this->repository->getRecent();
+        $recent = $this->repository->search(['status' => (isset(\['status']) ? sanitize_key((string) \['status']) : ''), 'client_id' => (isset(\['client_id']) ? (int) \['client_id'] : null), 'search' => (isset(\['q']) ? sanitize_text_field((string) \['q']) : '')], 50);
         $clientUrls = $this->gatherClientUrlRows();
         $clientOptions = $this->getClientOptions();
         $categoryOptions = $this->buildCategoryMap();
@@ -958,6 +958,7 @@ final class QueuePage
         return $slug !== '' ? $slug : 'default';
     }
 }
+
 
 
 
