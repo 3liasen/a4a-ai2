@@ -11,8 +11,6 @@
   "git.postCommitCommand": "push",
   "git.confirmSync": false,
   "git.autofetch": true,
-  "git.defaultCloneDirectory": "C:\\gits",
-  "git.ignoredRepositories": ["G:\\"],
   "window.restoreWindows": "none",
   "files.exclude": { "**/dist": true, "**/node_modules": true }
 }

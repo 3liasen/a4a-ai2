@@ -57,7 +57,11 @@ final class QueuePage
         }
 
         $message = isset($_GET['message']) ? sanitize_text_field((string) $_GET['message']) : null;
-        $recent = $this->repository->search(['status' => (isset(\['status']) ? sanitize_key((string) \['status']) : ''), 'client_id' => (isset(\['client_id']) ? (int) \['client_id'] : null), 'search' => (isset(\['q']) ? sanitize_text_field((string) \['q']) : '')], 50);
+         = ->captureFilterState();
+         = ['values'];
+         = ['args'];
+         = ->repository->search(['query'], 50);
+         = add_query_arg(, admin_url('admin.php'));
         $clientUrls = $this->gatherClientUrlRows();
         $clientOptions = $this->getClientOptions();
         $categoryOptions = $this->buildCategoryMap();
